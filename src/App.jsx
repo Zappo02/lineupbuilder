@@ -68,52 +68,111 @@ const TEAM_KIT = {
 function KitSVG({ club, size = 32 }) {
   const kit = TEAM_KIT[club] || { p:"#374151", s:"#6b7280", style:"solid" };
   const { p: primary, s: secondary, style } = kit;
-  const w = size, h = Math.round(size * 1.15);
-  // Safe pattern ID (no spaces, no special chars)
-  const pid = `kit_${club.replace(/[^a-zA-Z0-9]/g, "_")}_${size}`;
+  // Lavoriamo su un viewBox fisso 100x120 poi scaliamo con width/height
+  // Così le coordinate sono sempre % e non dipendono da size
+  const VW = 100, VH = 120;
 
-  // Shirt path
-  const body = `M${w*.22},${h*.14} L${w*.02},${h*.38} L${w*.19},${h*.45} L${w*.19},${h*.98} L${w*.81},${h*.98} L${w*.81},${h*.45} L${w*.98},${h*.38} L${w*.78},${h*.14} Q${w*.65},${h*.02} ${w*.5},${h*.09} Q${w*.35},${h*.02} ${w*.22},${h*.14}Z`;
-  const lsleeve = `M${w*.22},${h*.14} L${w*.02},${h*.38} L${w*.19},${h*.45} L${w*.26},${h*.28}Z`;
-  const rsleeve = `M${w*.78},${h*.14} L${w*.98},${h*.38} L${w*.81},${h*.45} L${w*.74},${h*.28}Z`;
+  // Path della maglia nel sistema 100x120
+  // Corpo: spalle → fondo, con scollo a V
+  const bodyD = [
+    "M22,14",          // spalla sx
+    "Q50,2 78,14",     // scollo (curva)
+    "L98,36",          // ascella dx
+    "L80,44",          // inizio fianco dx
+    "L80,118",         // fianco dx
+    "L20,118",         // fondo
+    "L20,44",          // fianco sx
+    "L2,36",           // ascella sx
+    "Z"
+  ].join(" ");
+
+  // Manica sinistra
+  const sleeveLD = "M22,14 L2,36 L20,44 L27,26 Z";
+  // Manica destra
+  const sleeveRD = "M78,14 L98,36 L80,44 L73,26 Z";
+
+  // ID univoci per evitare conflitti tra istanze
+  const uid = club.replace(/[^a-zA-Z0-9]/g,"_");
+  const cpBodyId  = `cpb_${uid}`;
+  const cpSlvLId  = `cpsl_${uid}`;
+  const cpSlvRId  = `cpsr_${uid}`;
+  const patId     = `pat_${uid}`;
+
+  // Numero di righe verticali visibili nel corpo (4 strisce = 2 colori alternati)
+  const nStripes = 4;
+  const stripeW  = VW / nStripes; // 25px ciascuna
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ flexShrink:0, display:"block" }}>
+    <svg width={size} height={Math.round(size*1.2)} viewBox={`0 0 ${VW} ${VH}`}
+      style={{ flexShrink:0, display:"block" }}>
       <defs>
-        {style==="stripes-v" && (
-          <pattern id={pid} x="0" y="0" width={w*.25} height={h} patternUnits="userSpaceOnUse">
-            <rect width={w*.125} height={h} fill={primary}/>
-            <rect x={w*.125} width={w*.125} height={h} fill={secondary}/>
+        {/* ClipPath corpo */}
+        <clipPath id={cpBodyId}><path d={bodyD}/></clipPath>
+        {/* ClipPath manica sx */}
+        <clipPath id={cpSlvLId}><path d={sleeveLD}/></clipPath>
+        {/* ClipPath manica dx */}
+        <clipPath id={cpSlvRId}><path d={sleeveRD}/></clipPath>
+
+        {/* Pattern righe verticali definito sul viewBox */}
+        {style === "stripes-v" && (
+          <pattern id={patId} x="0" y="0" width={stripeW*2} height={VH}
+            patternUnits="userSpaceOnUse">
+            <rect x="0"         width={stripeW} height={VH} fill={primary}/>
+            <rect x={stripeW}   width={stripeW} height={VH} fill={secondary}/>
           </pattern>
         )}
-        {style==="stripes-h" && (
-          <pattern id={pid} x="0" y="0" width={w} height={h*.16} patternUnits="userSpaceOnUse">
-            <rect width={w} height={h*.08} fill={primary}/>
-            <rect y={h*.08} width={w} height={h*.08} fill={secondary}/>
+        {/* Pattern righe orizzontali */}
+        {style === "stripes-h" && (
+          <pattern id={patId} x="0" y="0" width={VW} height={20}
+            patternUnits="userSpaceOnUse">
+            <rect width={VW} height={10} fill={primary}/>
+            <rect y={10} width={VW} height={10} fill={secondary}/>
           </pattern>
         )}
-        <clipPath id={`cp_${pid}`}>
-          <path d={body}/>
-        </clipPath>
       </defs>
 
-      {/* Body fill */}
-      <path d={body} fill={
-        style==="stripes-v" || style==="stripes-h" ? `url(#${pid})` : primary
-      } stroke="rgba(255,255,255,0.2)" strokeWidth="0.6"/>
+      {/* ── CORPO ───────────────────────────────────────── */}
+      {/* Base sempre solida */}
+      <path d={bodyD} fill={primary}/>
 
-      {/* Halves: right side different color */}
-      {style==="halves" && (
-        <path d={`M${w*.5},${h*.09} L${w*.78},${h*.14} L${w*.98},${h*.38} L${w*.81},${h*.45} L${w*.81},${h*.98} L${w*.5},${h*.98}Z`}
-          fill={secondary} clipPath={`url(#cp_${pid})`} opacity="0.9"/>
+      {/* Righe applicate via rect+clipPath (unico modo affidabile cross-browser) */}
+      {(style === "stripes-v" || style === "stripes-h") && (
+        <rect x="0" y="0" width={VW} height={VH}
+          fill={`url(#${patId})`} clipPath={`url(#${cpBodyId})`}/>
       )}
 
-      {/* Sleeves */}
-      <path d={lsleeve} fill={secondary} opacity="0.75"/>
-      <path d={rsleeve} fill={secondary} opacity="0.75"/>
+      {/* Metà destra diversa (Bologna, Genoa) */}
+      {style === "halves" && (
+        <rect x={VW/2} y="0" width={VW/2} height={VH}
+          fill={secondary} clipPath={`url(#${cpBodyId})`}/>
+      )}
 
-      {/* Collar */}
-      <ellipse cx={w*.5} cy={h*.11} rx={w*.1} ry={h*.05} fill={secondary} opacity="0.95"/>
+      {/* Contorno corpo */}
+      <path d={bodyD} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.8"/>
+
+      {/* ── MANICHE ─────────────────────────────────────── */}
+      {/* Manica sx: colore secondario */}
+      <path d={sleeveLD} fill={secondary}/>
+      {/* Se righe verticali, applica pattern anche alle maniche */}
+      {style === "stripes-v" && (
+        <rect x="0" y="0" width={VW} height={VH}
+          fill={`url(#${patId})`} clipPath={`url(#${cpSlvLId})`}/>
+      )}
+
+      {/* Manica dx: colore secondario */}
+      <path d={sleeveRD} fill={secondary}/>
+      {style === "stripes-v" && (
+        <rect x="0" y="0" width={VW} height={VH}
+          fill={`url(#${patId})`} clipPath={`url(#${cpSlvRId})`}/>
+      )}
+
+      {/* Contorni maniche */}
+      <path d={sleeveLD} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.6"/>
+      <path d={sleeveRD} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.6"/>
+
+      {/* ── COLLETTO ────────────────────────────────────── */}
+      <ellipse cx="50" cy="10" rx="9" ry="5"
+        fill={secondary} stroke="rgba(255,255,255,0.15)" strokeWidth="0.5"/>
     </svg>
   );
 }
@@ -167,65 +226,98 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
   };
 
   // Touch drag handlers
-  const handleTouchStart = e => {
-    if (!player) return;
-    const touch = e.touches[0];
-    touchDrag.active = true;
-    touchDrag.player = player;
-    touchDrag.fromSlot = slot;
-    // Create ghost element
-    const ghost = document.createElement("div");
-    ghost.id = "touch-drag-ghost";
-    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:44px;height:44px;border-radius:50%;background:${border}33;border:3px solid ${border};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${color};font-family:'Barlow Condensed',sans-serif;transform:translate(-50%,-50%);box-shadow:0 0 20px ${border}88;`;
-    ghost.textContent = player.shortName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-    ghost.style.left = touch.clientX + "px";
-    ghost.style.top  = touch.clientY + "px";
-    document.body.appendChild(ghost);
-    touchDrag.ghost = ghost;
-    e.preventDefault();
+  // ── Pointer Events drag (funziona su PC touch e mouse) ──────────────────
+  const pointerDown = useRef(false);
+  const longPressTimer = useRef(null);
+
+  const handlePointerDown = e => {
+    if (!player || e.button === 2) return;
+    pointerDown.current = true;
+    // Long press di 300ms per avviare drag su touch
+    longPressTimer.current = setTimeout(() => {
+      if (!pointerDown.current) return;
+      touchDrag.active = true;
+      touchDrag.player = player;
+      touchDrag.fromSlot = slot;
+      // Ghost
+      const existing = document.getElementById("tdg");
+      if (existing) existing.remove();
+      const ghost = document.createElement("div");
+      ghost.id = "tdg";
+      ghost.style.cssText = [
+        "position:fixed","pointer-events:none","z-index:9999",
+        "width:50px","height:50px","border-radius:50%",
+        `background:${border}44`,`border:3px solid ${border}`,
+        "display:flex","align-items:center","justify-content:center",
+        `font-size:14px`,`font-weight:800`,`color:${color}`,
+        "font-family:'Barlow Condensed',sans-serif",
+        "transform:translate(-50%,-65%)",
+        `box-shadow:0 4px 20px ${border}99`,
+        `left:${e.clientX}px`,`top:${e.clientY}px`,
+      ].join(";");
+      ghost.textContent = getInitials(player.name);
+      document.body.appendChild(ghost);
+      touchDrag.ghost = ghost;
+      // Vibrate feedback on mobile
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 280);
   };
 
-  const handleTouchMove = e => {
+  const handlePointerMove = e => {
     if (!touchDrag.active) return;
-    const touch = e.touches[0];
     if (touchDrag.ghost) {
-      touchDrag.ghost.style.left = touch.clientX + "px";
-      touchDrag.ghost.style.top  = touch.clientY + "px";
+      touchDrag.ghost.style.left = e.clientX + "px";
+      touchDrag.ghost.style.top  = e.clientY + "px";
     }
+    // Highlight slot under pointer
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    document.querySelectorAll("[data-slot]").forEach(s => s.removeAttribute("data-drag-over"));
+    const slotEl = el?.closest("[data-slot]");
+    if (slotEl) slotEl.setAttribute("data-drag-over","1");
     e.preventDefault();
   };
 
-  const handleTouchEnd = e => {
+  const handlePointerUp = e => {
+    clearTimeout(longPressTimer.current);
+    pointerDown.current = false;
+    document.querySelectorAll("[data-slot]").forEach(s => s.removeAttribute("data-drag-over"));
     if (!touchDrag.active) return;
     if (touchDrag.ghost) { touchDrag.ghost.remove(); touchDrag.ghost = null; }
-    // Find which slot we're over by touch position
-    const touch = e.changedTouches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const el = document.elementFromPoint(e.clientX, e.clientY);
     const slotEl = el?.closest("[data-slot]");
     if (slotEl) {
       const targetSlot = parseInt(slotEl.dataset.slot);
-      if (targetSlot !== touchDrag.fromSlot) {
-        onDrop(targetSlot, { player: touchDrag.player, fromSlot: touchDrag.fromSlot });
-      }
+      onDrop(targetSlot, { player: touchDrag.player, fromSlot: touchDrag.fromSlot });
     }
     touchDrag.active = false;
     touchDrag.player = null;
     touchDrag.fromSlot = null;
   };
 
+  // Mantengo handleTouchStart/Move/End come alias vuoti per compatibilità
+  const handleTouchStart = () => {};
+  const handleTouchMove  = () => {};
+  const handleTouchEnd   = () => {};
+
   return (
     <div
       data-slot={slot}
-      onDragOver={e=>{e.preventDefault();setIsDragOver(true);}} onDragLeave={()=>setIsDragOver(false)} onDrop={handleDrop}
-      onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      style={{ position:"absolute", left:`${posData.x}%`, top:`${posData.y}%`, transform:"translate(-50%,-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:2, zIndex:10, touchAction:"none" }}>
+      onDragOver={e=>{e.preventDefault();setIsDragOver(true);}}
+      onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setIsDragOver(false);}}
+      onDrop={handleDrop}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ position:"absolute", left:`${posData.x}%`, top:`${posData.y}%`, transform:"translate(-50%,-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:2, zIndex:isDragOver?20:10 }}>
       {player ? (
         <>
           <div draggable
-            onDragStart={e=>e.dataTransfer.setData("application/json",JSON.stringify({player,fromSlot:slot}))}
-            onTouchStart={handleTouchStart}
+            onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/json",JSON.stringify({player,fromSlot:slot}));}}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onClick={()=>onClick(slot)}
-            style={{ position:"relative", cursor:"grab", transform:isDragOver?"scale(1.18)":"scale(1)", transition:"transform 0.12s", userSelect:"none" }}>
+            style={{ position:"relative", cursor:"grab", transform:isDragOver?"scale(1.15)":"scale(1)", transition:"transform 0.12s", WebkitUserSelect:"none", userSelect:"none", WebkitTouchCallout:"none", touchAction:"none" }}>
             {showKits ? (
               <>
                 <KitSVG club={player.club} size={38}/>
@@ -262,7 +354,7 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
 function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamName, teamColor, activeStats, showKits, captain }) {
   const positions = FORMATIONS[formation]?.positions || [];
   return (
-    <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none" }}>
+    <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none", WebkitUserSelect:"none", overscrollBehavior:"none" }}>
       <svg viewBox="0 0 300 450" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
         <defs>
           <linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#1a4d2e"/><stop offset="100%" stopColor="#1d5c35"/></linearGradient>
@@ -441,7 +533,7 @@ function PlayerSearch({ onSelectPlayer, onClose, selectedSlotRole, currentLineup
 
           {/* Search */}
           <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cerca per nome o club..."
-            style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:7, padding:"7px 11px", color:"#fff", fontSize:13, outline:"none", boxSizing:"border-box", marginBottom:7 }}/>
+            style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:7, padding:"7px 11px", color:"#fff", fontSize:16, outline:"none", boxSizing:"border-box", marginBottom:7 }}/>
 
           {/* Position pills */}
           <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:7 }}>
@@ -1030,7 +1122,21 @@ export default function App() {
 
   return (
     <div style={{ minHeight:"100vh", background:"#0a0e1a", color:"#fff", fontFamily:"'Inter',sans-serif" }}>
-      <style>{`*{box-sizing:border-box;}body{margin:0;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}input[type=range]{accent-color:#ffd700;}`}</style>
+      <style>{`
+        *{box-sizing:border-box;}
+        html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
+        input[type=range]{accent-color:#ffd700;}
+        /* Prevent iOS zoom on input focus — font-size must be ≥16px */
+        input,select,textarea{font-size:16px!important;}
+        /* But we override display size via transform for small inputs */
+        .small-input{transform-origin:left top;transform:scale(0.75);width:133%!important;}
+        /* Prevent iOS bounce/scroll on pitch */
+        [data-slot]{-webkit-tap-highlight-color:transparent;}
+        /* data-drag-over highlight */
+        [data-drag-over="1"]{filter:brightness(1.4);}
+      `}</style>
 
       <header style={{ background:"rgba(0,0,0,0.65)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0 14px", height:50, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
