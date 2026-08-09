@@ -9,7 +9,45 @@ const decodeLineup = str => { try { return JSON.parse(decodeURIComponent(escape(
 const getInitials = name => name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
 const getRatingColor = r => r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";
 const SAVED_KEY = "lineup_builder_v5";
-const MAX_FIELD_STATS = 2; // max stat badges visible on pitch per player
+const MAX_FIELD_STATS = 2;
+
+// ─── UNDO / REDO HOOK ────────────────────────────────────────────────────────
+function useUndoRedo(initial) {
+  const [states, setStates] = useState([initial]);
+  const [idx, setIdx] = useState(0);
+  const current = states[idx];
+  const canUndo = idx > 0;
+  const canRedo = idx < states.length - 1;
+  const set = useCallback(val => {
+    const next = typeof val === 'function' ? val(states[idx]) : val;
+    setStates(prev => [...prev.slice(0, idx + 1), next]);
+    setIdx(i => i + 1);
+  }, [states, idx]);
+  const undo = useCallback(() => { if (canUndo) setIdx(i => i - 1); }, [canUndo]);
+  const redo = useCallback(() => { if (canRedo) setIdx(i => i + 1); }, [canRedo]);
+  const reset = useCallback(val => { setStates([val]); setIdx(0); }, []);
+  return [current, set, undo, redo, canUndo, canRedo, reset];
+}
+
+// ─── AUTO-FILL helper ────────────────────────────────────────────────────────
+function autoFillLineup(formation, existingLineup, pool) {
+  const positions = FORMATIONS[formation]?.positions || [];
+  const newLineup = [...existingLineup];
+  const usedIds = new Set(newLineup.filter(Boolean).map(p => p.id));
+  const sorted = [...pool].sort((a, b) => b.rating - a.rating);
+  positions.forEach(pos => {
+    if (newLineup[pos.slot]) return;
+    const best = sorted.find(p => p.position === pos.role && !usedIds.has(p.id));
+    if (best) { newLineup[pos.slot] = best; usedIds.add(best.id); }
+  });
+  // second pass: fill remaining with any player
+  positions.forEach(pos => {
+    if (newLineup[pos.slot]) return;
+    const best = sorted.find(p => !usedIds.has(p.id));
+    if (best) { newLineup[pos.slot] = best; usedIds.add(best.id); }
+  });
+  return newLineup;
+}
 
 // ─── KIT SVG (fixed, no pattern IDs clashing) ─────────────────────────────────
 const TEAM_KIT = {
@@ -114,7 +152,7 @@ function StatBadges({ player, activeStats }) {
 }
 
 // ─── PITCH SLOT ──────────────────────────────────────────────────────────────
-function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColor, activeStats, showKits }) {
+function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColor, activeStats, showKits, captain }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const color = POSITION_COLORS[posData.role] || "#6b7280";
   const border = teamColor || color;
@@ -144,7 +182,10 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
           </div>
           <div style={{ background:"rgba(0,0,0,0.88)", borderRadius:5, padding:"1px 5px", maxWidth:82, textAlign:"center" }} onClick={()=>onClick(slot)}>
             <div style={{ fontSize:8, color:"#9ca3af", fontWeight:700 }}>{posData.role}</div>
-            <div style={{ fontSize:10, color:"#fff", fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{player.shortName}</div>
+            <div style={{ fontSize:10, color:"#fff", fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {captain===player?.id && <span style={{ color:"#ffd700", marginRight:2 }}>★</span>}
+              {player.shortName}
+            </div>
             {altPlayer && <div style={{ fontSize:8, color:"#16a34a", fontWeight:600, borderTop:"1px solid rgba(22,163,74,0.3)", marginTop:1, paddingTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>↕ {altPlayer.shortName}</div>}
           </div>
           <StatBadges player={player} activeStats={activeStats}/>
@@ -160,7 +201,7 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
 }
 
 // ─── PITCH ───────────────────────────────────────────────────────────────────
-function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamName, teamColor, activeStats, showKits }) {
+function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamName, teamColor, activeStats, showKits, captain }) {
   const positions = FORMATIONS[formation]?.positions || [];
   return (
     <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none" }}>
@@ -191,7 +232,7 @@ function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamNam
           player={lineup[pd.slot]||null}
           altPlayer={altPlayers[pd.slot]?PLAYERS.find(p=>p.id===altPlayers[pd.slot])||null:null}
           onDrop={onSlotDrop} onClick={onSlotClick}
-          teamColor={teamColor} activeStats={activeStats} showKits={showKits}/>
+          teamColor={teamColor} activeStats={activeStats} showKits={showKits} captain={captain}/>
       ))}
     </div>
   );
@@ -297,8 +338,11 @@ function PlayerSearch({ onSelectPlayer, onClose, selectedSlotRole, currentLineup
   const [posFilter, setPosFilter] = useState("ALL");
   const [clubFilter, setClubFilter] = useState("ALL");
   const [minRating, setMinRating] = useState(60);
-  const [footFilter, setFootFilter] = useState("ALL");   // ALL | R | L
-  const [contractFilter, setContractFilter] = useState("ALL"); // ALL | expiring | safe
+  const [maxAge, setMaxAge]       = useState(40);
+  const [maxWage, setMaxWage]     = useState(10000);
+  const [maxValue, setMaxValue]   = useState(300);
+  const [footFilter, setFootFilter] = useState("ALL");
+  const [contractFilter, setContractFilter] = useState("ALL");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef();
   useEffect(()=>{ inputRef.current?.focus(); },[]);
@@ -310,10 +354,13 @@ function PlayerSearch({ onSelectPlayer, onClose, selectedSlotRole, currentLineup
   const filtered = PLAYERS.filter(p=>{
     const q = query.toLowerCase();
     if (!isAlt && usedIds.has(p.id)) return false;
-    if (!query || p.name.toLowerCase().includes(q) || p.club.toLowerCase().includes(q)) {} else return false;
+    if (query && !p.name.toLowerCase().includes(q) && !p.club.toLowerCase().includes(q)) return false;
     if (posFilter!=="ALL" && !(posFilter==="GK"&&p.position==="GK") && !(posMap[posFilter]?.includes(p.position))) return false;
     if (clubFilter!=="ALL" && p.club!==clubFilter) return false;
     if (p.rating < minRating) return false;
+    if (p.age > maxAge) return false;
+    if (p.wage > maxWage) return false;
+    if (p.value > maxValue) return false;
     if (footFilter!=="ALL" && p.foot!==footFilter) return false;
     if (contractFilter==="expiring" && p.contract > 2026) return false;
     if (contractFilter==="safe" && p.contract <= 2026) return false;
@@ -381,6 +428,24 @@ function PlayerSearch({ onSelectPlayer, onClose, selectedSlotRole, currentLineup
                     <button key={v} onClick={()=>setContractFilter(v)} style={{ padding:"3px 10px", borderRadius:5, fontSize:10, fontWeight:700, cursor:"pointer", border:"1px solid", background:contractFilter===v?"#f97316":"transparent", borderColor:contractFilter===v?"#f97316":"rgba(255,255,255,0.15)", color:contractFilter===v?"#fff":"#9ca3af" }}>{l}</button>
                   ))}
                 </div>
+              </div>
+              {/* Age */}
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:10, color:"#6b7280", width:60, flexShrink:0 }}>Età max</span>
+                <input type="range" min="18" max="40" value={maxAge} onChange={e=>setMaxAge(+e.target.value)} style={{ flex:1, accentColor:"#3b82f6" }}/>
+                <span style={{ fontSize:12, fontWeight:800, color:"#3b82f6", width:30, textAlign:"right" }}>{maxAge===40?"∞":maxAge+"a"}</span>
+              </div>
+              {/* Wage */}
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:10, color:"#6b7280", width:60, flexShrink:0 }}>Stip. max</span>
+                <input type="range" min="0" max="10000" step="500" value={maxWage} onChange={e=>setMaxWage(+e.target.value)} style={{ flex:1, accentColor:"#f59e0b" }}/>
+                <span style={{ fontSize:11, fontWeight:800, color:"#f59e0b", width:42, textAlign:"right" }}>{maxWage>=10000?"∞":`€${maxWage}K`}</span>
+              </div>
+              {/* Value */}
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:10, color:"#6b7280", width:60, flexShrink:0 }}>Valore max</span>
+                <input type="range" min="0" max="300" step="10" value={maxValue} onChange={e=>setMaxValue(+e.target.value)} style={{ flex:1, accentColor:"#16a34a" }}/>
+                <span style={{ fontSize:11, fontWeight:800, color:"#16a34a", width:42, textAlign:"right" }}>{maxValue>=300?"∞":`€${maxValue}M`}</span>
               </div>
             </div>
           )}
@@ -521,7 +586,7 @@ function CompareHeader({ team1, team2, lineup1, lineup2 }) {
 }
 
 // ─── LINEUP PANEL (click slot libero → apri search) ──────────────────────────
-function LineupPanel({ lineup, altPlayers, formation, onRemovePlayer, onRemoveAlt, onClickSlot, activeStats }) {
+function LineupPanel({ lineup, altPlayers, formation, onRemovePlayer, onRemoveAlt, onClickSlot, activeStats, captain, onSetCaptain }) {
   const positions = FORMATIONS[formation]?.positions||[];
   const shownStats = STAT_VIEWS.filter(s=>activeStats.includes(s.id)&&s.id!=="rating");
   return (
@@ -544,16 +609,19 @@ function LineupPanel({ lineup, altPlayers, formation, onRemovePlayer, onRemoveAl
                   <>
                     <KitSVG club={player.club} size={22}/>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                        {player.shortName}
-                        {player.foot==="L"&&<span style={{ fontSize:8, color:"#ec4899", marginLeft:3 }}>✦</span>}
-                        {isExpiring&&<span style={{ fontSize:8, color:"#ef4444", marginLeft:3 }}>⚠{player.contract}</span>}
+                      <div style={{ fontSize:11, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:3 }}>
+                        {captain===player.id && <span style={{ color:"#ffd700", fontSize:10 }}>★</span>}
+                        <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{player.shortName}</span>
+                        {player.foot==="L"&&<span style={{ fontSize:8, color:"#ec4899" }}>✦</span>}
+                        {isExpiring&&<span style={{ fontSize:8, color:"#ef4444" }}>⚠{player.contract}</span>}
                       </div>
                       {shownStats.length>0&&<div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
                         {shownStats.map(sv=>player[sv.id]!==undefined&&<span key={sv.id} style={{ fontSize:8, color:sv.id==="contract"&&isExpiring?"#ef4444":sv.color, fontWeight:700 }}>{sv.id==="nation"?NATION_FLAGS[player.nation]||player.nation:sv.id==="foot"?(player.foot==="L"?"✦ Mancino":"Destro"):`${sv.icon}${sv.format(player[sv.id])}`}</span>)}
                       </div>}
                     </div>
                     {activeStats.includes("rating")&&<div style={{ fontSize:10, fontWeight:800, color:getRatingColor(player.rating), flexShrink:0 }}>{player.rating}</div>}
+                    <button onClick={e=>{e.stopPropagation();onSetCaptain(player.id);}} title="Capitano"
+                      style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, color:captain===player.id?"#ffd700":"#374151", padding:2, flexShrink:0 }}>★</button>
                     <button onClick={e=>{e.stopPropagation();onRemovePlayer(pos.slot);}} style={{ background:"none", border:"none", color:"#374151", cursor:"pointer", fontSize:11, padding:2, flexShrink:0 }}>✕</button>
                   </>
                 ) : (
@@ -578,15 +646,32 @@ function LineupPanel({ lineup, altPlayers, formation, onRemovePlayer, onRemoveAl
 }
 
 // ─── BENCH PANEL ─────────────────────────────────────────────────────────────
-function BenchPanel({ benchPlayers, lineup, altPlayers, onSetAlt, activeStats }) {
+function BenchPanel({ benchPlayers, lineup, altPlayers, onSetAlt, activeStats, captain, onSetCaptain }) {
+  const [sortBy, setSortBy] = useState("rating");
   const shownStats = STAT_VIEWS.filter(s=>activeStats.includes(s.id)&&s.id!=="rating");
   const starterIds = new Set(lineup.filter(Boolean).map(p=>p.id));
-  const bench = benchPlayers.filter(p=>!starterIds.has(p.id));
+  const bench = benchPlayers.filter(p=>!starterIds.has(p.id)).sort((a,b)=>{
+    if(sortBy==="rating") return b.rating-a.rating;
+    if(sortBy==="age") return a.age-b.age;
+    if(sortBy==="value") return b.value-a.value;
+    if(sortBy==="wage") return b.wage-a.wage;
+    if(sortBy==="role") return (POSITION_COLORS[a.position]||"z").localeCompare(POSITION_COLORS[b.position]||"z");
+    return 0;
+  });
   return (
     <div style={{ background:"#111827", borderRadius:12, border:"1px solid rgba(255,255,255,0.08)", overflow:"hidden" }}>
       <div style={{ padding:"9px 12px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, color:"#fff" }}>Rosa ({bench.length})</div>
-        <div style={{ fontSize:9, color:"#4b5563", marginTop:1 }}>Clicca → imposta alternativa ↕</div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, color:"#fff" }}>Rosa ({bench.length})</div>
+          <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:5, padding:"2px 6px", color:"#9ca3af", fontSize:10, outline:"none" }}>
+            <option value="rating">Rating ↓</option>
+            <option value="age">Età ↑</option>
+            <option value="value">Valore ↓</option>
+            <option value="wage">Stipendio ↓</option>
+            <option value="role">Ruolo</option>
+          </select>
+        </div>
+        <div style={{ fontSize:9, color:"#4b5563", marginTop:2 }}>Clicca → alternativa ↕ · ★ → capitano</div>
       </div>
       <div style={{ overflowY:"auto", maxHeight:500 }}>
         {bench.length===0&&<div style={{ padding:20, color:"#374151", fontSize:12, textAlign:"center" }}>Carica una squadra</div>}
@@ -595,14 +680,15 @@ function BenchPanel({ benchPlayers, lineup, altPlayers, onSetAlt, activeStats })
           const isAltFor=Object.values(altPlayers).includes(player.id);
           const isExpiring=player.contract<=2026;
           return (
-            <div key={player.id} onClick={()=>onSetAlt(player)}
+            <div key={player.id}
               style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", borderBottom:"1px solid rgba(255,255,255,0.04)", cursor:"pointer" }}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}
               onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <div style={{ width:22, fontSize:8, fontWeight:700, color:rc, background:rc+"22", borderRadius:3, textAlign:"center", padding:"2px", flexShrink:0 }}>{player.position}</div>
-              <KitSVG club={player.club} size={22}/>
-              <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ flexShrink:0 }} onClick={()=>onSetAlt(player)}><KitSVG club={player.club} size={22}/></div>
+              <div style={{ flex:1, minWidth:0 }} onClick={()=>onSetAlt(player)}>
                 <div style={{ fontSize:11, fontWeight:700, color:isAltFor?"#16a34a":"#f9fafb", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {captain===player.id && <span style={{ color:"#ffd700", marginRight:3 }}>★</span>}
                   {player.shortName}
                   {player.foot==="L"&&<span style={{ fontSize:8, color:"#ec4899", marginLeft:3 }}>✦</span>}
                   {isExpiring&&<span style={{ fontSize:8, color:"#ef4444", marginLeft:3 }}>⚠{player.contract}</span>}
@@ -612,6 +698,8 @@ function BenchPanel({ benchPlayers, lineup, altPlayers, onSetAlt, activeStats })
                   {shownStats.map(sv=>player[sv.id]!==undefined&&<span key={sv.id} style={{ fontSize:8, color:sv.id==="contract"&&isExpiring?"#ef4444":sv.color, fontWeight:700 }}>{sv.id==="nation"?NATION_FLAGS[player.nation]||player.nation:sv.id==="foot"?(player.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(player[sv.id])}`}</span>)}
                 </div>}
               </div>
+              <button onClick={e=>{e.stopPropagation();onSetCaptain(player.id);}} title="Imposta capitano"
+                style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:captain===player.id?"#ffd700":"#374151", padding:2, flexShrink:0 }}>★</button>
               <div style={{ fontSize:10, fontWeight:800, color:getRatingColor(player.rating), flexShrink:0 }}>{player.rating}</div>
             </div>
           );
@@ -714,20 +802,24 @@ export default function App() {
   const [mode, setMode]  = useState("single");
   const [activeTeam, setActiveTeam] = useState(0);
 
-  const [lineup1,setLineup1]     = useState(Array(11).fill(null));
+  const [lineup1, setLineup1Raw, undoLineup1, redoLineup1, canUndo1, canRedo1, resetLineup1] = useUndoRedo(Array(11).fill(null));
+  const setLineup1 = setLineup1Raw;
   const [formation1,setFormation1] = useState("4-3-3");
   const [teamName1,setTeamName1]  = useState("Squadra A");
   const [teamColor1,setTeamColor1] = useState("#16a34a");
   const [altPlayers1,setAltPlayers1] = useState({});
   const [bench1,setBench1]        = useState([]);
 
-  const [lineup2,setLineup2]     = useState(Array(11).fill(null));
+  const [lineup2, setLineup2Raw, undoLineup2, redoLineup2, canUndo2, canRedo2, resetLineup2] = useUndoRedo(Array(11).fill(null));
+  const setLineup2 = setLineup2Raw;
   const [formation2,setFormation2] = useState("4-3-3");
   const [teamName2,setTeamName2]  = useState("Squadra B");
   const [teamColor2,setTeamColor2] = useState("#2563eb");
   const [altPlayers2,setAltPlayers2] = useState({});
   const [bench2,setBench2]        = useState([]);
 
+  const [captain1, setCaptain1] = useState(null);  // player id
+  const [captain2, setCaptain2] = useState(null);
   const [activeStats,setActiveStats] = useState(["rating"]);
   const [showKits,setShowKits]    = useState(false);
   const [selectingSlot,setSelectingSlot] = useState(null);
@@ -752,6 +844,12 @@ export default function App() {
   const setTeamColor = activeTeam===0?setTeamColor1:setTeamColor2;
   const setAltPlayers = activeTeam===0?setAltPlayers1:setAltPlayers2;
   const setBench   = activeTeam===0?setBench1:setBench2;
+  const captain    = activeTeam===0?captain1:captain2;
+  const setCaptain = activeTeam===0?setCaptain1:setCaptain2;
+  const canUndo    = activeTeam===0?canUndo1:canUndo2;
+  const canRedo    = activeTeam===0?canRedo1:canRedo2;
+  const undoLineup = activeTeam===0?undoLineup1:undoLineup2;
+  const redoLineup = activeTeam===0?redoLineup1:redoLineup2;
 
   useEffect(()=>{
     const hash=window.location.hash.slice(1);
@@ -777,6 +875,13 @@ export default function App() {
     setLineup(newLineup);setTeamName(teamData.name);setTeamColor(teamData.color);
     setAltPlayers({});setBench(PLAYERS.filter(p=>p.club===teamData.name));
     setShowTeamPicker(false);setToast(`${teamData.name} caricata! ⚽`);
+  };
+
+  const handleAutoFill = () => {
+    const pool = bench.length > 0 ? bench : PLAYERS;
+    const filled = autoFillLineup(formation, lineup, pool);
+    setLineup(filled);
+    setToast("Auto-fill completato! 🤖");
   };
 
   const openSlot = (slot, isAlt=false) => {
@@ -845,6 +950,9 @@ export default function App() {
               <button key={m.id} onClick={()=>{setMode(m.id);setActiveTeam(0);}} style={{ padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, background:mode===m.id?"#16a34a":"transparent", color:mode===m.id?"#fff":"#9ca3af" }}>{m.label}</button>
             ))}
           </div>
+          <button onClick={undoLineup} disabled={!canUndo} title="Annulla (Undo)" style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", color:canUndo?"#fff":"#374151", borderRadius:6, padding:"5px 8px", cursor:canUndo?"pointer":"default", fontSize:12 }}>↩</button>
+          <button onClick={redoLineup} disabled={!canRedo} title="Ripristina (Redo)" style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", color:canRedo?"#fff":"#374151", borderRadius:6, padding:"5px 8px", cursor:canRedo?"pointer":"default", fontSize:12 }}>↪</button>
+          <button onClick={handleAutoFill} title="Auto-fill migliori giocatori" style={{ background:"rgba(99,102,241,0.15)", border:"1px solid rgba(99,102,241,0.4)", color:"#818cf8", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>🤖</button>
           <button onClick={()=>setExporting(true)} title="Esporta PNG" style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", color:"#fff", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>📸</button>
           <button onClick={handleSave} style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", color:"#fff", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>💾</button>
           <button onClick={()=>setShowSaved(s=>!s)} style={{ background:showSaved?"#16a34a18":"rgba(255,255,255,0.07)", border:`1px solid ${showSaved?"#16a34a":"rgba(255,255,255,0.1)"}`, color:showSaved?"#16a34a":"#fff", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:11 }}>📁{savedLineups.length>0&&`(${savedLineups.length})`}</button>
@@ -883,7 +991,7 @@ export default function App() {
           <Pitch lineup={lineup1} altPlayers={altPlayers1} formation={formation1}
             onSlotDrop={(slot,data)=>handleSlotDrop(slot,data,0)}
             onSlotClick={slot=>{setActiveTeam(0);openSlot(slot);}}
-            teamName={teamName1} teamColor={teamColor1} activeStats={activeStats} showKits={showKits}/>
+            teamName={teamName1} teamColor={teamColor1} activeStats={activeStats} showKits={showKits} captain={captain1}/>
         </div>
 
         {/* COL 3: Pitch 2 or Lineup+Bench */}
@@ -891,14 +999,14 @@ export default function App() {
           <Pitch lineup={lineup2} altPlayers={altPlayers2} formation={formation2}
             onSlotDrop={(slot,data)=>handleSlotDrop(slot,data,1)}
             onSlotClick={slot=>{setActiveTeam(1);openSlot(slot);}}
-            teamName={teamName2} teamColor={teamColor2} activeStats={activeStats} showKits={showKits}/>
+            teamName={teamName2} teamColor={teamColor2} activeStats={activeStats} showKits={showKits} captain={captain2}/>
         ) : (
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             <LineupPanel lineup={lineup} altPlayers={altPlayers} formation={formation}
               onRemovePlayer={handleRemovePlayer} onRemoveAlt={handleRemoveAlt}
               onClickSlot={slot=>openSlot(slot)}
-              activeStats={activeStats}/>
-            <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats}/>
+              activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
+            <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
           </div>
         )}
 
@@ -908,7 +1016,7 @@ export default function App() {
             <SquadStats lineup={lineup}/>
             {mode==="compare"&&<div style={{ display:"flex", flexDirection:"column", gap:10 }}>
               <LineupPanel lineup={lineup} altPlayers={altPlayers} formation={formation} onRemovePlayer={handleRemovePlayer} onRemoveAlt={handleRemoveAlt} onClickSlot={slot=>openSlot(slot)} activeStats={activeStats}/>
-              <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats}/>
+              <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
             </div>}
           </div>
         )}
