@@ -35,23 +35,46 @@ const initials = name => name.split(" ").map(w=>w[0]).join("").slice(0,2).toUppe
 const ratingColor = r => r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";
 
 // ─── UNDO/REDO ────────────────────────────────────────────────────────────────
-function useUndoRedo(init) {
-  // Use a single ref-backed state to avoid stale closure bugs with idx
-  const [state, setState] = useState({ hist: [init], idx: 0 });
-  const current = state.hist[state.idx];
-  const set = useCallback(val => {
-    setState(s => {
-      const cur = s.hist[s.idx];
-      const next = typeof val === "function" ? val(cur) : val;
-      return { hist: [...s.hist.slice(0, s.idx + 1), next], idx: s.idx + 1 };
+// Simple: plain useState for current value + useRef for history stack
+// No closures over stale indices.
+function useUndoable(init) {
+  const [val, setVal] = useState(init);
+  const past   = useRef([]);   // stack of previous values
+  const future = useRef([]);   // stack of undone values
+
+  const set = useCallback(updater => {
+    setVal(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      past.current = [...past.current, prev];
+      future.current = [];
+      return next;
     });
   }, []);
-  const undo = useCallback(() => setState(s => s.idx > 0 ? { ...s, idx: s.idx - 1 } : s), []);
-  const redo = useCallback(() => setState(s => s.idx < s.hist.length - 1 ? { ...s, idx: s.idx + 1 } : s), []);
-  const reset = useCallback(val => setState({ hist: [val], idx: 0 }), []);
-  const canUndo = state.idx > 0;
-  const canRedo = state.idx < state.hist.length - 1;
-  return [current, set, undo, redo, canUndo, canRedo, reset];
+
+  const undo = useCallback(() => {
+    if (past.current.length === 0) return;
+    const prev = past.current[past.current.length - 1];
+    past.current = past.current.slice(0, -1);
+    setVal(cur => { future.current = [cur, ...future.current]; return prev; });
+  }, []);
+
+  const redo = useCallback(() => {
+    if (future.current.length === 0) return;
+    const next = future.current[0];
+    future.current = future.current.slice(1);
+    setVal(cur => { past.current = [...past.current, cur]; return next; });
+  }, []);
+
+  const reset = useCallback(newVal => {
+    past.current = [];
+    future.current = [];
+    setVal(newVal);
+  }, []);
+
+  const canUndo = past.current.length > 0;
+  const canRedo = future.current.length > 0;
+
+  return [val, set, undo, redo, canUndo, canRedo, reset];
 }
 
 // ─── AUTO-FILL ────────────────────────────────────────────────────────────────
@@ -965,8 +988,8 @@ export default function App() {
   const [mode, setMode] = useState("single");
   const [activeTeam, setActiveTeam] = useState(0);
 
-  const [lineup1, setLineup1, undo1, redo1, canUndo1, canRedo1] = useUndoRedo(Array(11).fill(null));
-  const [lineup2, setLineup2, undo2, redo2, canUndo2, canRedo2] = useUndoRedo(Array(11).fill(null));
+  const [lineup1, setLineup1, undo1, redo1, canUndo1, canRedo1] = useUndoable(Array(11).fill(null));
+  const [lineup2, setLineup2, undo2, redo2, canUndo2, canRedo2] = useUndoable(Array(11).fill(null));
   const [formation1, setFormation1Raw] = useState("4-3-3");
   const [formation2, setFormation2Raw] = useState("4-3-3");
   const [teamName1, setTeamName1] = useState("Squadra A");
