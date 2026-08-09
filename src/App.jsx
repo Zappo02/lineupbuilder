@@ -152,22 +152,80 @@ function StatBadges({ player, activeStats }) {
 }
 
 // ─── PITCH SLOT ──────────────────────────────────────────────────────────────
+// Global touch drag state (shared between all PitchSlots)
+const touchDrag = { active: false, player: null, fromSlot: null, ghost: null };
+
 function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColor, activeStats, showKits, captain }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const color = POSITION_COLORS[posData.role] || "#6b7280";
   const border = teamColor || color;
   const showRating = activeStats.includes("rating");
+
   const handleDrop = e => {
     e.preventDefault(); setIsDragOver(false);
     try { onDrop(slot, JSON.parse(e.dataTransfer.getData("application/json"))); } catch {}
   };
+
+  // Touch drag handlers
+  const handleTouchStart = e => {
+    if (!player) return;
+    const touch = e.touches[0];
+    touchDrag.active = true;
+    touchDrag.player = player;
+    touchDrag.fromSlot = slot;
+    // Create ghost element
+    const ghost = document.createElement("div");
+    ghost.id = "touch-drag-ghost";
+    ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:44px;height:44px;border-radius:50%;background:${border}33;border:3px solid ${border};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${color};font-family:'Barlow Condensed',sans-serif;transform:translate(-50%,-50%);box-shadow:0 0 20px ${border}88;`;
+    ghost.textContent = player.shortName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+    ghost.style.left = touch.clientX + "px";
+    ghost.style.top  = touch.clientY + "px";
+    document.body.appendChild(ghost);
+    touchDrag.ghost = ghost;
+    e.preventDefault();
+  };
+
+  const handleTouchMove = e => {
+    if (!touchDrag.active) return;
+    const touch = e.touches[0];
+    if (touchDrag.ghost) {
+      touchDrag.ghost.style.left = touch.clientX + "px";
+      touchDrag.ghost.style.top  = touch.clientY + "px";
+    }
+    e.preventDefault();
+  };
+
+  const handleTouchEnd = e => {
+    if (!touchDrag.active) return;
+    if (touchDrag.ghost) { touchDrag.ghost.remove(); touchDrag.ghost = null; }
+    // Find which slot we're over by touch position
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const slotEl = el?.closest("[data-slot]");
+    if (slotEl) {
+      const targetSlot = parseInt(slotEl.dataset.slot);
+      if (targetSlot !== touchDrag.fromSlot) {
+        onDrop(targetSlot, { player: touchDrag.player, fromSlot: touchDrag.fromSlot });
+      }
+    }
+    touchDrag.active = false;
+    touchDrag.player = null;
+    touchDrag.fromSlot = null;
+  };
+
   return (
-    <div onDragOver={e=>{e.preventDefault();setIsDragOver(true);}} onDragLeave={()=>setIsDragOver(false)} onDrop={handleDrop}
-      style={{ position:"absolute", left:`${posData.x}%`, top:`${posData.y}%`, transform:"translate(-50%,-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:2, zIndex:10 }}>
+    <div
+      data-slot={slot}
+      onDragOver={e=>{e.preventDefault();setIsDragOver(true);}} onDragLeave={()=>setIsDragOver(false)} onDrop={handleDrop}
+      onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      style={{ position:"absolute", left:`${posData.x}%`, top:`${posData.y}%`, transform:"translate(-50%,-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:2, zIndex:10, touchAction:"none" }}>
       {player ? (
         <>
-          <div draggable onDragStart={e=>e.dataTransfer.setData("application/json",JSON.stringify({player,fromSlot:slot}))} onClick={()=>onClick(slot)}
-            style={{ position:"relative", cursor:"pointer", transform:isDragOver?"scale(1.18)":"scale(1)", transition:"transform 0.12s" }}>
+          <div draggable
+            onDragStart={e=>e.dataTransfer.setData("application/json",JSON.stringify({player,fromSlot:slot}))}
+            onTouchStart={handleTouchStart}
+            onClick={()=>onClick(slot)}
+            style={{ position:"relative", cursor:"grab", transform:isDragOver?"scale(1.18)":"scale(1)", transition:"transform 0.12s", userSelect:"none" }}>
             {showKits ? (
               <>
                 <KitSVG club={player.club} size={38}/>
@@ -839,7 +897,32 @@ export default function App() {
   const altPlayers = activeTeam===0?altPlayers1:altPlayers2;
   const bench      = activeTeam===0?bench1:bench2;
   const setLineup  = activeTeam===0?setLineup1:setLineup2;
-  const setFormation = activeTeam===0?setFormation1:setFormation2;
+  // Quando si cambia modulo, riordina i giocatori per ruolo
+  const changeFormation = useCallback((newFormation) => {
+    const setF = activeTeam===0?setFormation1:setFormation2;
+    const currentLineup = activeTeam===0?lineup1:lineup2;
+    const setL = activeTeam===0?setLineup1:setLineup2;
+    setF(newFormation);
+    const newPositions = FORMATIONS[newFormation]?.positions || [];
+    const players = currentLineup.filter(Boolean);
+    if (!players.length) return;
+    const newLineup = Array(11).fill(null);
+    const usedIds = new Set();
+    // Prima passa: assegna ogni giocatore allo slot corrispondente al suo ruolo
+    newPositions.forEach(pos => {
+      const match = players.find(p => p.position === pos.role && !usedIds.has(p.id));
+      if (match) { newLineup[pos.slot] = match; usedIds.add(match.id); }
+    });
+    // Seconda passa: metti i rimanenti nei slot vuoti
+    const remaining = players.filter(p => !usedIds.has(p.id));
+    newPositions.forEach(pos => {
+      if (newLineup[pos.slot]) return;
+      const p = remaining.shift();
+      if (p) { newLineup[pos.slot] = p; usedIds.add(p.id); }
+    });
+    setL(newLineup);
+  }, [activeTeam, lineup1, lineup2]);
+  const setFormation = changeFormation;
   const setTeamName  = activeTeam===0?setTeamName1:setTeamName2;
   const setTeamColor = activeTeam===0?setTeamColor1:setTeamColor2;
   const setAltPlayers = activeTeam===0?setAltPlayers1:setAltPlayers2;
@@ -900,8 +983,18 @@ export default function App() {
   };
 
   const handleSlotDrop = useCallback((slot,{player,fromSlot},teamIdx)=>{
-    const setter=teamIdx===0?setLineup1:setLineup2;
-    setter(prev=>{const next=[...prev];if(fromSlot!==undefined&&fromSlot!==null){[next[fromSlot],next[slot]]=[next[slot],next[fromSlot]];}else{next[slot]=player;}return next;});
+    const setter = teamIdx===0?setLineup1:setLineup2;
+    setter(prev=>{
+      const next=[...prev];
+      if (fromSlot !== undefined && fromSlot !== null) {
+        // Drag da slot a slot → scambia sempre (anche se destinazione è occupata)
+        [next[fromSlot], next[slot]] = [next[slot], next[fromSlot]];
+      } else {
+        // Drag dalla bench: se lo slot è già occupato, metti il nuovo e togli il vecchio
+        next[slot] = player;
+      }
+      return next;
+    });
   },[]);
 
   const handleBenchClick = player => setAltPickerPlayer(player);
