@@ -36,19 +36,22 @@ const ratingColor = r => r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b728
 
 // ─── UNDO/REDO ────────────────────────────────────────────────────────────────
 function useUndoRedo(init) {
-  const [hist, setHist] = useState([init]);
-  const [idx, setIdx] = useState(0);
+  // Use a single ref-backed state to avoid stale closure bugs with idx
+  const [state, setState] = useState({ hist: [init], idx: 0 });
+  const current = state.hist[state.idx];
   const set = useCallback(val => {
-    setHist(prev => {
-      const next = typeof val === "function" ? val(prev[idx]) : val;
-      return [...prev.slice(0, idx + 1), next];
+    setState(s => {
+      const cur = s.hist[s.idx];
+      const next = typeof val === "function" ? val(cur) : val;
+      return { hist: [...s.hist.slice(0, s.idx + 1), next], idx: s.idx + 1 };
     });
-    setIdx(i => i + 1);
-  }, [idx]);
-  const undo = useCallback(() => setIdx(i => Math.max(0, i - 1)), []);
-  const redo = useCallback(() => setIdx(i => Math.min(hist.length - 1, i + 1)), [hist.length]);
-  const reset = useCallback(val => { setHist([val]); setIdx(0); }, []);
-  return [hist[idx], set, undo, redo, idx > 0, idx < hist.length - 1, reset];
+  }, []);
+  const undo = useCallback(() => setState(s => s.idx > 0 ? { ...s, idx: s.idx - 1 } : s), []);
+  const redo = useCallback(() => setState(s => s.idx < s.hist.length - 1 ? { ...s, idx: s.idx + 1 } : s), []);
+  const reset = useCallback(val => setState({ hist: [val], idx: 0 }), []);
+  const canUndo = state.idx > 0;
+  const canRedo = state.idx < state.hist.length - 1;
+  return [current, set, undo, redo, canUndo, canRedo, reset];
 }
 
 // ─── AUTO-FILL ────────────────────────────────────────────────────────────────
@@ -187,17 +190,17 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
   const showRating = activeStats.includes("rating");
   const timerRef = useRef(null);
 
-  // ── PC: HTML5 drag & drop (reliable on desktop) ──────────────────────────
+  // ── PC: HTML5 drag & drop ────────────────────────────────────────────────
+  const enterCount = useRef(0); // track nested dragenter/dragleave
   const onDragStart = e => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify({ player, fromSlot: slot }));
-    // Small delay so browser renders the dragged element before hiding original
-    setTimeout(() => {}, 0);
   };
-  const onDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(true); };
-  const onDragLeave = e => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); };
+  const onDragEnter = e => { e.preventDefault(); enterCount.current++; setOver(true); };
+  const onDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
+  const onDragLeave = e => { enterCount.current--; if (enterCount.current === 0) setOver(false); };
   const handleDrop  = e => {
-    e.preventDefault(); setOver(false);
+    e.preventDefault(); enterCount.current = 0; setOver(false);
     try { onDrop(slot, JSON.parse(e.dataTransfer.getData("application/json"))); } catch {}
   };
 
@@ -258,7 +261,7 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
 
   if (!player) return (
     <div data-slot={slot} style={slotStyle}
-      onDragOver={onDragOver} onDragLeave={onDragLeave}
+      onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave}
       onDrop={handleDrop}>
       <div onClick={() => onClick(slot)} style={{
         width:44, height:44, borderRadius:"50%",
@@ -274,7 +277,7 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
 
   return (
     <div data-slot={slot} style={slotStyle}
-      onDragOver={onDragOver} onDragLeave={onDragLeave}
+      onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave}
       onDrop={handleDrop}>
       {/* Avatar / Kit */}
       <div
