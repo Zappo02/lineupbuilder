@@ -113,95 +113,69 @@ const TEAM_KIT = {
   "Torino":     { p:"#8B2500", s:"#ffffff", style:"solid" },
 };
 
-// Static SVG paths in 100×120 coordinate space
-const SHIRT_BODY   = "M22,16 Q50,4 78,16 L97,38 L80,46 L80,118 L20,118 L20,46 L3,38 Z";
-const SHIRT_SLV_L  = "M22,16 L3,38 L20,46 L28,28 Z";
-const SHIRT_SLV_R  = "M78,16 L97,38 L80,46 L72,28 Z";
+// Unique counter per KitSVG mount — guarantees unique SVG IDs per DOM instance
+let _kitCount = 0;
+
+// Shirt geometry in 100×120 viewBox
+const SB = "M22,16 Q50,4 78,16 L97,38 L80,46 L80,118 L20,118 L20,46 L3,38 Z";
+const SL = "M22,16 L3,38 L20,46 L28,28 Z";
+const SR = "M78,16 L97,38 L80,46 L72,28 Z";
 
 function KitSVG({ club, size = 32 }) {
+  // Each component instance gets its own ID namespace
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = ++_kitCount;
+  const u = `k${idRef.current}`;
+
   const kit = TEAM_KIT[club] || { p:"#374151", s:"#6b7280", style:"solid" };
   const { p: pri, s: sec, style } = kit;
   const th = useTheme();
-  const stroke = th === "dark" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.2)";
+  const sk = th === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.22)";
 
-  // Unique prefix per club — no size in ID so same club reuses defs
-  const u = `kit_${club.replace(/\W/g,"_")}`;
-
-  const stripeW = 25; // 4 stripes in 100px width
+  const W = 25; // stripe width (4 stripes across 100px)
 
   return (
     <svg width={size} height={Math.round(size * 1.2)}
       viewBox="0 0 100 120"
-      style={{ flexShrink:0, display:"block" }}>
+      style={{ flexShrink:0, display:"block", overflow:"visible" }}>
       <defs>
-        {/* Body clip */}
-        <clipPath id={`${u}_body`}><path d={SHIRT_BODY}/></clipPath>
-        {/* Sleeve clips */}
-        <clipPath id={`${u}_sl`}><path d={SHIRT_SLV_L}/></clipPath>
-        <clipPath id={`${u}_sr`}><path d={SHIRT_SLV_R}/></clipPath>
-
-        {/* Vertical stripes pattern (100×120 space) */}
+        <clipPath id={`${u}b`}><path d={SB}/></clipPath>
+        <clipPath id={`${u}l`}><path d={SL}/></clipPath>
+        <clipPath id={`${u}r`}><path d={SR}/></clipPath>
         {style === "stripes-v" && (
-          <pattern id={`${u}_pat`} x="0" y="0"
-            width={stripeW * 2} height="120"
-            patternUnits="userSpaceOnUse">
-            <rect x="0"         width={stripeW} height="120" fill={pri}/>
-            <rect x={stripeW}   width={stripeW} height="120" fill={sec}/>
-          </pattern>
-        )}
-        {/* Horizontal stripes */}
-        {style === "stripes-h" && (
-          <pattern id={`${u}_pat`} x="0" y="0"
-            width="100" height="20"
-            patternUnits="userSpaceOnUse">
-            <rect width="100" height="10" fill={pri}/>
-            <rect y="10" width="100" height="10" fill={sec}/>
+          <pattern id={`${u}p`} x="0" y="0" width={W*2} height="120" patternUnits="userSpaceOnUse">
+            <rect x="0" width={W}   height="120" fill={pri}/>
+            <rect x={W} width={W}   height="120" fill={sec}/>
           </pattern>
         )}
       </defs>
 
-      {/* ── BODY ── */}
-      {/* 1. solid base */}
-      <path d={SHIRT_BODY} fill={pri}/>
-      {/* 2. stripes overlaid via rect+clipPath */}
-      {(style === "stripes-v" || style === "stripes-h") && (
-        <rect x="0" y="0" width="100" height="120"
-          fill={`url(#${u}_pat)`}
-          clipPath={`url(#${u}_body)`}/>
-      )}
-      {/* 3. halves */}
-      {style === "halves" && (
-        <rect x="50" y="0" width="50" height="120"
-          fill={sec}
-          clipPath={`url(#${u}_body)`}/>
-      )}
-      {/* outline */}
-      <path d={SHIRT_BODY} fill="none" stroke={stroke} strokeWidth="1"/>
+      {/* Body base */}
+      <path d={SB} fill={pri}/>
+      {/* Vertical stripes clipped to body */}
+      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}b)`}/>}
+      {/* Halves */}
+      {style === "halves" && <rect x="50" y="0" width="50" height="120" fill={sec} clipPath={`url(#${u}b)`}/>}
+      {/* Body outline */}
+      <path d={SB} fill="none" stroke={sk} strokeWidth="1"/>
 
-      {/* ── SLEEVES ── */}
-      <path d={SHIRT_SLV_L} fill={sec}/>
-      {style === "stripes-v" && (
-        <rect x="0" y="0" width="100" height="120"
-          fill={`url(#${u}_pat)`}
-          clipPath={`url(#${u}_sl)`}/>
-      )}
-      <path d={SHIRT_SLV_R} fill={sec}/>
-      {style === "stripes-v" && (
-        <rect x="0" y="0" width="100" height="120"
-          fill={`url(#${u}_pat)`}
-          clipPath={`url(#${u}_sr)`}/>
-      )}
-      <path d={SHIRT_SLV_L} fill="none" stroke={stroke} strokeWidth="0.8"/>
-      <path d={SHIRT_SLV_R} fill="none" stroke={stroke} strokeWidth="0.8"/>
+      {/* Sleeve L */}
+      <path d={SL} fill={sec}/>
+      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}l)`}/>}
+      <path d={SL} fill="none" stroke={sk} strokeWidth="0.8"/>
 
-      {/* ── COLLAR ── */}
-      <ellipse cx="50" cy="11" rx="9" ry="5" fill={sec} stroke={stroke} strokeWidth="0.5"/>
+      {/* Sleeve R */}
+      <path d={SR} fill={sec}/>
+      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}r)`}/>}
+      <path d={SR} fill="none" stroke={sk} strokeWidth="0.8"/>
+
+      {/* Collar */}
+      <ellipse cx="50" cy="11" rx="9" ry="5" fill={sec} stroke={sk} strokeWidth="0.5"/>
     </svg>
   );
 }
-
-// ─── DRAG STATE (module-level, not React state to avoid re-renders) ─────────
-const drag = { active:false, player:null, fromSlot:null, ghost:null };
+// ─── MODULE-LEVEL TOUCH DRAG STATE ──────────────────────────────────────────
+const td = { on:false, player:null, fromSlot:null, ghost:null, onDrop:null };
 
 // ─── PITCH SLOT ──────────────────────────────────────────────────────────────
 function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColor, activeStats, showKits, captain }) {
@@ -213,67 +187,66 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
   const showRating = activeStats.includes("rating");
   const timerRef = useRef(null);
 
-  // ── Desktop HTML5 drag ───────────────────────────────────────────────────
+  // ── PC: HTML5 drag & drop (reliable on desktop) ──────────────────────────
   const onDragStart = e => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify({ player, fromSlot: slot }));
+    // Small delay so browser renders the dragged element before hiding original
+    setTimeout(() => {}, 0);
   };
-  const onDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect="move"; setOver(true); };
+  const onDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(true); };
   const onDragLeave = e => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); };
   const handleDrop  = e => {
     e.preventDefault(); setOver(false);
     try { onDrop(slot, JSON.parse(e.dataTransfer.getData("application/json"))); } catch {}
   };
 
-  // ── Touch / Pointer long-press drag ─────────────────────────────────────
-  const startDrag = (clientX, clientY) => {
+  // ── MOBILE: touch events (separate from pointer/drag to avoid conflicts) ─
+  const touchStart = e => {
     if (!player) return;
-    drag.active = true;
-    drag.player = player;
-    drag.fromSlot = slot;
-    const g = document.createElement("div");
-    g.id = "drag-ghost";
-    g.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:48px;height:48px;border-radius:50%;background:${border}55;border:3px solid ${border};display:flex;align-items:center;justify-content:center;font:800 14px 'Barlow Condensed',sans-serif;color:${color};transform:translate(-50%,-60%);box-shadow:0 4px 20px ${border}99;left:${clientX}px;top:${clientY}px;`;
-    g.textContent = initials(player.name);
-    document.body.appendChild(g);
-    drag.ghost = g;
-    if (navigator.vibrate) navigator.vibrate(35);
+    const t = e.touches[0];
+    timerRef.current = setTimeout(() => {
+      // Start touch drag after 300ms hold
+      td.on = true; td.player = player; td.fromSlot = slot; td.onDrop = onDrop;
+      const g = document.createElement("div");
+      g.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:46px;height:46px;border-radius:50%;background:${border}55;border:3px solid ${border};display:flex;align-items:center;justify-content:center;font:800 13px 'Barlow Condensed',sans-serif;color:${color};transform:translate(-50%,-65%);box-shadow:0 4px 20px ${border}99;top:${t.clientY}px;left:${t.clientX}px;`;
+      g.textContent = initials(player.name);
+      document.body.appendChild(g);
+      td.ghost = g;
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 300);
   };
-
-  const moveDrag = (clientX, clientY) => {
-    if (!drag.active) return;
-    if (drag.ghost) { drag.ghost.style.left = clientX+"px"; drag.ghost.style.top = clientY+"px"; }
-    document.querySelectorAll("[data-slot]").forEach(el => el.style.outline = "");
-    const target = document.elementFromPoint(clientX, clientY)?.closest("[data-slot]");
-    if (target) target.style.outline = `2px solid ${border}`;
-  };
-
-  const endDrag = (clientX, clientY) => {
+  const touchMove = e => {
     clearTimeout(timerRef.current);
-    if (drag.ghost) { drag.ghost.remove(); drag.ghost = null; }
-    document.querySelectorAll("[data-slot]").forEach(el => el.style.outline = "");
-    if (!drag.active) return;
-    const target = document.elementFromPoint(clientX, clientY)?.closest("[data-slot]");
-    if (target) {
-      onDrop(parseInt(target.dataset.slot), { player: drag.player, fromSlot: drag.fromSlot });
+    if (!td.on) return;
+    e.preventDefault(); // prevent page scroll during drag
+    const t = e.touches[0];
+    if (td.ghost) { td.ghost.style.left = t.clientX+"px"; td.ghost.style.top = t.clientY+"px"; }
+    // Highlight target slot
+    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const tgt = el?.closest("[data-slot]");
+    if (tgt) tgt.style.boxShadow = `0 0 0 2px ${border}`;
+  };
+  const touchEnd = e => {
+    clearTimeout(timerRef.current);
+    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
+    if (!td.on) return;
+    if (td.ghost) { td.ghost.remove(); td.ghost = null; }
+    const t = e.changedTouches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const tgt = el?.closest("[data-slot]");
+    if (tgt) {
+      const tgtSlot = parseInt(tgt.dataset.slot);
+      td.onDrop(tgtSlot, { player: td.player, fromSlot: td.fromSlot });
     }
-    drag.active = false; drag.player = null; drag.fromSlot = null;
+    td.on = false; td.player = null; td.fromSlot = null; td.onDrop = null;
   };
-
-  const onPointerDown = e => {
-    if (!player || e.button === 2) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const cx = e.clientX, cy = e.clientY;
-    timerRef.current = setTimeout(() => startDrag(cx, cy), 300);
-  };
-  const onPointerMove = e => {
-    if (!drag.active) { clearTimeout(timerRef.current); return; }
-    e.preventDefault();
-    moveDrag(e.clientX, e.clientY);
-  };
-  const onPointerUp = e => {
+  const touchCancel = e => {
     clearTimeout(timerRef.current);
-    if (drag.active) endDrag(e.clientX, e.clientY);
+    if (td.ghost) { td.ghost.remove(); td.ghost = null; }
+    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
+    td.on = false; td.player = null; td.fromSlot = null;
   };
 
   const slotStyle = {
@@ -307,15 +280,15 @@ function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColo
       <div
         draggable
         onDragStart={onDragStart}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onTouchStart={touchStart}
+        onTouchMove={touchMove}
+        onTouchEnd={touchEnd}
+        onTouchCancel={touchCancel}
         onClick={() => onClick(slot)}
         style={{
           position:"relative", cursor:"grab",
           transform: over ? "scale(1.15)" : "scale(1)", transition:"transform 0.12s",
-          userSelect:"none", WebkitUserSelect:"none", touchAction:"none",
+          userSelect:"none", WebkitUserSelect:"none", WebkitTouchCallout:"none",
         }}>
         {showKits ? (
           <KitSVG club={player.club} size={40}/>
@@ -389,7 +362,7 @@ function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamNam
   const T  = th === "dark" ? DARK : LIGHT;
   const positions = FORMATIONS[formation]?.positions || [];
   return (
-    <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none", WebkitUserSelect:"none" }}>
+    <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none", WebkitUserSelect:"none", touchAction:"pan-y" }}>
       <svg viewBox="0 0 300 450" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
         <defs>
           <linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -955,6 +928,29 @@ function Toast({ message, onDone }) {
   return <div style={{ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:"#16a34a", color:"#fff", padding:"10px 20px", borderRadius:10, fontWeight:700, fontSize:14, zIndex:999, boxShadow:"0 8px 24px rgba(0,0,0,0.4)", whiteSpace:"nowrap" }}>{message}</div>;
 }
 
+
+// ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
+function ConfirmModal({ teamData, onConfirm, onCancel }) {
+  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:T.panel, borderRadius:14, width:"100%", maxWidth:360, border:`1px solid ${T.panelBorder}`, padding:24, textAlign:"center" }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:700, color:T.text, marginBottom:8 }}>
+          Sovrascrivere la formazione?
+        </div>
+        <div style={{ fontSize:13, color:T.textMuted, marginBottom:20, lineHeight:1.5 }}>
+          Hai già giocatori in campo. Caricare <strong style={{ color:T.text }}>{teamData.name}</strong> sostituirà tutti i titolari attuali.
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:"10px", borderRadius:8, border:`1px solid ${T.panelBorder}`, background:"transparent", color:T.textMuted, cursor:"pointer", fontSize:13, fontWeight:600 }}>Annulla</button>
+          <button onClick={onConfirm} style={{ flex:1, padding:"10px", borderRadius:8, border:"none", background:"#16a34a", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700 }}>Carica {teamData.name}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── XL ROLE MAP ─────────────────────────────────────────────────────────────
 const XLR = {'GK':'GK','ST':'ST','LS':'ST','RS':'ST','CF':'ST','LCB':'CB','RCB':'CB','CB':'CB','MCB':'CB','LB':'LB','LWB':'LB','RB':'RB','RWB':'RB','CDM':'DM','LCDM':'DM','RCDM':'DM','LCM':'CM','RCM':'CM','CM':'CM','CAM':'AM','LAM':'LW','RAM':'RW','LM':'LM','RM':'RM','LW':'LW','RW':'RW'};
 
@@ -1028,7 +1024,9 @@ export default function App() {
     setSavedLineups(JSON.parse(localStorage.getItem(SAVED_KEY)||"[]"));
   },[]);
 
-  const loadTeam = useCallback(teamData => {
+  const [pendingTeam, setPendingTeam] = useState(null);
+
+  const doLoadTeam = useCallback(teamData => {
     const tf = teamData.formation || "4-3-3";
     const positions = FORMATIONS[tf]?.positions || [];
     const newLineup = Array(11).fill(null);
@@ -1066,7 +1064,19 @@ export default function App() {
     }
     setShowTeamPicker(false);
     setToast(`${teamData.name} caricata! ⚽`);
+    setPendingTeam(null);
   }, [activeTeam]);
+
+  const loadTeam = useCallback(teamData => {
+    const currentLineup = activeTeam === 0 ? lineup1 : lineup2;
+    const hasPlayers = currentLineup.some(Boolean);
+    if (hasPlayers) {
+      setPendingTeam(teamData);
+      setShowTeamPicker(false);
+    } else {
+      doLoadTeam(teamData);
+    }
+  }, [activeTeam, lineup1, lineup2, doLoadTeam]);
 
   const handleAutoFill = () => {
     const pool = bench.length > 0 ? bench : PLAYERS;
@@ -1260,6 +1270,7 @@ export default function App() {
         {altPickerPlayer && <AltSlotPicker player={altPickerPlayer} lineup={lineup} positions={positions} onSelect={handleAltSlotSelect} onClose={()=>setAltPickerPlayer(null)}/>}
         {exporting && <ExportCanvas lineup={lineup} formation={formation} teamName={teamName} teamColor={teamColor} activeStats={activeStats} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
         {toast && <Toast message={toast} onDone={()=>setToast(null)}/>}
+        {pendingTeam && <ConfirmModal teamData={pendingTeam} onConfirm={()=>doLoadTeam(pendingTeam)} onCancel={()=>setPendingTeam(null)}/>}
       </div>
     </ThemeCtx.Provider>
   );
