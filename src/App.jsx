@@ -40,40 +40,59 @@ const KITS = {
   Genoa:{p:"#8B0000",s:"#1B4F72",t:"h"},Torino:{p:"#8B2500",s:"#fff",t:"s"},
 };
 
-let _kc = 0;
-
 function KitSVG({club, size=32}) {
   const k = KITS[club] || {p:"#555",s:"#888",t:"s"};
   const th = useContext(ThemeCtx);
-  const sk = th==="dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)";
-  const idRef = useRef(null);
-  if (idRef.current === null) idRef.current = ++_kc;
-  const u = `k${idRef.current}`;
-  const body = "M13,10 Q30,2 47,10 L58,23 L48,28 L48,70 L12,70 L12,28 L2,23 Z";
-  const slvL = "M13,10 L2,23 L12,28 L17,17 Z";
-  const slvR = "M47,10 L58,23 L48,28 L43,17 Z";
+  const sk = th==="dark" ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)";
+  // Geometria semplificata in viewBox 60×72
+  // Corpo = trapezio (leggermente più largo in basso)
+  // Maniche = triangoli ai lati
+  const BX=14, BX2=46, TY=20, BY=70; // body left, right, top, bottom
+  const BW=BX2-BX; // body width = 32
+  const SW=BW/4;    // stripe width = 8
   return (
     <svg width={size} height={Math.round(size*1.2)} viewBox="0 0 60 72" style={{display:"block",flexShrink:0}}>
-      <defs>
-        <clipPath id={`${u}b`}><path d={body}/></clipPath>
-        <clipPath id={`${u}l`}><path d={slvL}/></clipPath>
-        <clipPath id={`${u}r`}><path d={slvR}/></clipPath>
-      </defs>
-      <path d={body} fill={k.p}/>
-      {k.t==="sv" && <g clipPath={`url(#${u}b)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
-      {k.t==="h" && <rect x={30} y={0} width={30} height={72} fill={k.s} clipPath={`url(#${u}b)`}/>}
-      <path d={body} fill="none" stroke={sk} strokeWidth="0.8"/>
-      <path d={slvL} fill={k.s}/>
-      {k.t==="sv" && <g clipPath={`url(#${u}l)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
-      <path d={slvL} fill="none" stroke={sk} strokeWidth="0.6"/>
-      <path d={slvR} fill={k.s}/>
-      {k.t==="sv" && <g clipPath={`url(#${u}r)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
-      <path d={slvR} fill="none" stroke={sk} strokeWidth="0.6"/>
-      <ellipse cx={30} cy={7} rx={6} ry={3} fill={k.s} stroke={sk} strokeWidth="0.4"/>
+      {/* Corpo base */}
+      <rect x={BX} y={TY} width={BW} height={BY-TY} rx="1" fill={k.p}/>
+
+      {/* Strisce verticali — rect individuali dentro il corpo, NIENTE clipPath */}
+      {k.t==="sv" && [1,3].map(i =>
+        <rect key={i} x={BX+i*SW} y={TY} width={SW} height={BY-TY} fill={k.s}/>
+      )}
+
+      {/* Metà destra per halves */}
+      {k.t==="h" && <rect x={30} y={TY} width={BX2-30} height={BY-TY} fill={k.s}/>}
+
+      {/* Spalle — trapezi che connettono corpo alle maniche */}
+      <polygon points={`${BX},${TY} ${BX},${TY+4} 6,${TY+10} 6,${TY+4}`} fill={k.p}/>
+      <polygon points={`${BX2},${TY} ${BX2},${TY+4} 54,${TY+10} 54,${TY+4}`} fill={k.p}/>
+
+      {/* Strisce sulle spalle per sv */}
+      {k.t==="sv" && <>
+        <polygon points={`${BX},${TY} ${BX},${TY+4} 6,${TY+10} 6,${TY+4}`} fill={k.s} opacity="0.5"/>
+        <polygon points={`${BX2},${TY} ${BX2},${TY+4} 54,${TY+10} 54,${TY+4}`} fill={k.s} opacity="0.5"/>
+      </>}
+
+      {/* Maniche */}
+      <rect x={2} y={TY+4} width={10} height={14} rx="1" fill={k.s}/>
+      <rect x={48} y={TY+4} width={10} height={14} rx="1" fill={k.s}/>
+
+      {/* Strisce sulle maniche per sv */}
+      {k.t==="sv" && <>
+        <rect x={2} y={TY+4} width={5} height={14} rx="1" fill={k.p}/>
+        <rect x={48} y={TY+4} width={5} height={14} rx="1" fill={k.p}/>
+      </>}
+
+      {/* Contorni */}
+      <rect x={BX} y={TY} width={BW} height={BY-TY} rx="1" fill="none" stroke={sk} strokeWidth="0.6"/>
+      <rect x={2} y={TY+4} width={10} height={14} rx="1" fill="none" stroke={sk} strokeWidth="0.4"/>
+      <rect x={48} y={TY+4} width={10} height={14} rx="1" fill="none" stroke={sk} strokeWidth="0.4"/>
+
+      {/* Colletto V */}
+      <path d={`M25,${TY} L30,${TY+5} L35,${TY}`} fill="none" stroke={k.s} strokeWidth="1.5"/>
     </svg>
   );
 }
-
 /* ═══════════════════════════════════════════════════════════════════════════
    STAT BADGES
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -153,11 +172,31 @@ function PitchSlot({slot, pos, player, alt, onDrop, onClick, tColor, stats, kits
 /* ═══════════════════════════════════════════════════════════════════════════
    PITCH
    ═══════════════════════════════════════════════════════════════════════════ */
-function PitchView({lineup, alts, form, onDrop, onClick, name, color, stats, kits, cap}) {
+function PitchView({lineup, alts, form, onDrop, onClick, name, color, stats, kits, cap, customPos={}, onPitchDrop}) {
   const th = useContext(ThemeCtx); const T = THEMES[th];
-  const positions = FORMATIONS[form]?.positions||[];
+  const basePositions = FORMATIONS[form]?.positions||[];
+  const positions = basePositions.map(p => customPos[p.slot] ? {...p, x:customPos[p.slot].x, y:customPos[p.slot].y} : p);
   return (
-    <div style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none"}}>
+    <div style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none"}}
+      onDragOver={e=>e.preventDefault()}
+      onDrop={e=>{
+        e.preventDefault();
+        // Check if dropped on background (not on a slot)
+        const tgt = e.target.closest("[data-slot]");
+        if (tgt) return; // handled by PitchSlot
+        try {
+          const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+          if (data.slot === undefined) return;
+          // Calculate position as % of pitch
+          const rect = e.currentTarget.getBoundingClientRect();
+          const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+          const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+          // Clamp
+          const cx = Math.max(5, Math.min(95, xPct));
+          const cy = Math.max(5, Math.min(95, yPct));
+          if (onPitchDrop) onPitchDrop(data.slot, cx, cy);
+        } catch {}
+      }}>
       <svg viewBox="0 0 300 450" style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
         <defs><linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor={T.pDark}/><stop offset="100%" stopColor={T.pLight}/>
@@ -569,6 +608,7 @@ export default function App() {
   const [name,   setName]       = useState("La mia Squadra");
   const [color,  setColor]      = useState("#16a34a");
   const [alts,   setAlts]       = useState({});
+  const [customPos, setCustomPos] = useState({});  // {slot: {x,y}} override positions
   const [bench,  setBench]      = useState([]);
   const [cap,    setCap]        = useState(null);
 
@@ -587,7 +627,7 @@ export default function App() {
 
   // ── Formation change — simple: just set formation, DON'T remap ──────────
   // Players stay in their slots. No crash possible.
-  const setForm = useCallback(f => setFormRaw(f), []);
+  const setForm = useCallback(f => { setFormRaw(f); setCustomPos({}); }, []);
 
   // ── Load team ───────────────────────────────────────────────────────────
   const doLoad = useCallback(team => {
@@ -615,6 +655,7 @@ export default function App() {
     setName(team.name);
     setColor(team.color);
     setAlts({});
+    setCustomPos({});
     setBench(PLAYERS.filter(p=>p.club===team.name));
     setTeamPicker(false);
     setPending(null);
@@ -647,6 +688,11 @@ export default function App() {
   };
 
   // ── Drag & drop (HTML5 only, works on PC) ───────────────────────────────
+  const handlePitchDrop = useCallback((slotIdx, xPct, yPct) => {
+    // Move the slot to a custom position on the pitch
+    setCustomPos(prev => ({...prev, [slotIdx]: {x: xPct, y: yPct}}));
+  }, []);
+
   const handleDrop = useCallback((targetSlot, data) => {
     setLineup(prev => {
       const next = [...prev];
@@ -732,11 +778,11 @@ export default function App() {
             <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)} alt={altMode} setAlt={setAltMode}/>
             <StatSel stats={stats} setStats={setStats}/>
             <div style={{background:T.panel,borderRadius:10,border:`1px solid ${T.border}`,padding:"8px 12px"}}>
-              <button onClick={()=>{setLineup(Array(11).fill(null));setAlts({});setBench([]);}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button>
+              <button onClick={()=>{setLineup(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button>
             </div>
           </div>
 
-          <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick}
+          <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} customPos={customPos} onPitchDrop={handlePitchDrop}
             name={name} color={color} stats={stats} kits={kits} cap={cap}/>
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
