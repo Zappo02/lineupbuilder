@@ -1,411 +1,198 @@
-import React, { useState, useRef, useEffect, useCallback, useContext, createContext } from "react";
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { PLAYERS, FORMATIONS, POSITION_COLORS, STAT_VIEWS, SERIE_A_TEAMS, NATION_FLAGS } from "./data/players.js";
 
-// ─── THEME ───────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME
+   ═══════════════════════════════════════════════════════════════════════════ */
 const ThemeCtx = createContext("dark");
-const useTheme = () => useContext(ThemeCtx);
-
-const DARK = {
-  bg: "#0a0e1a", panel: "#111827", panelBorder: "rgba(255,255,255,0.08)",
-  text: "#f9fafb", textMuted: "#6b7280", textFaint: "#374151",
-  inputBg: "rgba(255,255,255,0.07)", inputBorder: "rgba(255,255,255,0.12)",
-  headerBg: "rgba(0,0,0,0.65)", pitchDark: "#1a4d2e", pitchLight: "#1d5c35",
-  fieldLine: "rgba(255,255,255,0.28)", labelBg: "rgba(0,0,0,0.88)",
-  stripeShadow: "rgba(255,255,255,0.18)", kitStroke: "rgba(255,255,255,0.15)",
-};
-const LIGHT = {
-  bg: "#f0f4f8", panel: "#ffffff", panelBorder: "rgba(0,0,0,0.1)",
-  text: "#111827", textMuted: "#4b5563", textFaint: "#9ca3af",
-  inputBg: "rgba(0,0,0,0.05)", inputBorder: "rgba(0,0,0,0.15)",
-  headerBg: "rgba(255,255,255,0.9)", pitchDark: "#2d6a4f", pitchLight: "#40916c",
-  fieldLine: "rgba(255,255,255,0.5)", labelBg: "rgba(0,0,0,0.75)",
-  stripeShadow: "rgba(0,0,0,0.2)", kitStroke: "rgba(0,0,0,0.15)",
+const THEMES = {
+  dark: { bg:"#0a0e1a",panel:"#111827",border:"rgba(255,255,255,0.08)",text:"#f9fafb",
+    dim:"#6b7280",faint:"#374151",inpBg:"rgba(255,255,255,0.07)",inpBd:"rgba(255,255,255,0.12)",
+    head:"rgba(0,0,0,0.65)",pDark:"#1a4d2e",pLight:"#1d5c35",line:"rgba(255,255,255,0.28)",
+    label:"rgba(0,0,0,0.88)",stroke:"rgba(255,255,255,0.2)" },
+  light: { bg:"#f0f4f8",panel:"#ffffff",border:"rgba(0,0,0,0.1)",text:"#111827",
+    dim:"#4b5563",faint:"#9ca3af",inpBg:"rgba(0,0,0,0.05)",inpBd:"rgba(0,0,0,0.15)",
+    head:"rgba(255,255,255,0.9)",pDark:"#2d6a4f",pLight:"#40916c",line:"rgba(255,255,255,0.5)",
+    label:"rgba(0,0,0,0.75)",stroke:"rgba(0,0,0,0.22)" },
 };
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const SAVED_KEY = "lineup_builder_v6";
-const MAX_FIELD_STATS = 2;
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ini = n => n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const rc  = r => r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";
+const XLR = {GK:"GK",ST:"ST",LS:"ST",RS:"ST",CF:"ST",LCB:"CB",RCB:"CB",CB:"CB",MCB:"CB",
+  LB:"LB",LWB:"LB",RB:"RB",RWB:"RB",CDM:"DM",LCDM:"DM",RCDM:"DM",LCM:"CM",RCM:"CM",
+  CM:"CM",CAM:"AM",LAM:"LW",RAM:"RW",LM:"LM",RM:"RM",LW:"LW",RW:"RW"};
+const SAVE_KEY = "lu_v7";
 
-// ─── UTILITY ─────────────────────────────────────────────────────────────────
-const enc = (lineup, formation, teamName, color, altPlayers) => {
-  try { return btoa(unescape(encodeURIComponent(JSON.stringify({f:formation,n:teamName,c:color,l:lineup.map(s=>s?.id??null),a:altPlayers})))); } catch { return ""; }
-};
-const dec = str => { try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch { return null; } };
-const initials = name => name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-const ratingColor = r => r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";
-
-// ─── UNDO/REDO ────────────────────────────────────────────────────────────────
-// Simple: plain useState for current value + useRef for history stack
-// No closures over stale indices.
-function useUndoable(init) {
-  const [val, setVal] = useState(init);
-  const past   = useRef([]);   // stack of previous values
-  const future = useRef([]);   // stack of undone values
-
-  const set = useCallback(updater => {
-    setVal(prev => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      past.current = [...past.current, prev];
-      future.current = [];
-      return next;
-    });
-  }, []);
-
-  const undo = useCallback(() => {
-    if (past.current.length === 0) return;
-    const prev = past.current[past.current.length - 1];
-    past.current = past.current.slice(0, -1);
-    setVal(cur => { future.current = [cur, ...future.current]; return prev; });
-  }, []);
-
-  const redo = useCallback(() => {
-    if (future.current.length === 0) return;
-    const next = future.current[0];
-    future.current = future.current.slice(1);
-    setVal(cur => { past.current = [...past.current, cur]; return next; });
-  }, []);
-
-  const reset = useCallback(newVal => {
-    past.current = [];
-    future.current = [];
-    setVal(newVal);
-  }, []);
-
-  const canUndo = past.current.length > 0;
-  const canRedo = future.current.length > 0;
-
-  return [val, set, undo, redo, canUndo, canRedo, reset];
-}
-
-// ─── AUTO-FILL ────────────────────────────────────────────────────────────────
-function autoFill(formation, existing, pool) {
-  const positions = FORMATIONS[formation]?.positions || [];
-  const next = [...existing];
-  const used = new Set(next.filter(Boolean).map(p => p.id));
-  const sorted = [...pool].sort((a,b) => b.rating - a.rating);
-  // Pass 1: match exact role
-  positions.forEach(pos => {
-    if (next[pos.slot]) return;
-    const p = sorted.find(p => p.position === pos.role && !used.has(p.id));
-    if (p) { next[pos.slot] = p; used.add(p.id); }
-  });
-  // Pass 2: fill remaining
-  positions.forEach(pos => {
-    if (next[pos.slot]) return;
-    const p = sorted.find(p => !used.has(p.id));
-    if (p) { next[pos.slot] = p; used.add(p.id); }
-  });
-  return next;
-}
-
-// ─── REMAP LINEUP on formation change ────────────────────────────────────────
-function remapToFormation(newFormation, currentLineup) {
-  const positions = FORMATIONS[newFormation]?.positions || [];
-  const players = currentLineup.filter(Boolean);
-  if (!players.length) return Array(11).fill(null);
-  const next = Array(11).fill(null);
-  const used = new Set();
-  // Pass 1: exact role match
-  positions.forEach(pos => {
-    const p = players.find(p => p.position === pos.role && !used.has(p.id));
-    if (p) { next[pos.slot] = p; used.add(p.id); }
-  });
-  // Pass 2: fill remaining slots
-  const remaining = players.filter(p => !used.has(p.id));
-  positions.forEach(pos => {
-    if (next[pos.slot]) return;
-    const p = remaining.shift();
-    if (p) { next[pos.slot] = p; used.add(p.id); }
-  });
-  return next;
-}
-
-// ─── KIT SVG ─────────────────────────────────────────────────────────────────
-// Uses a fixed internal 100×120 coordinate system rendered via viewBox.
-// Stripes use rect+clipPath to guarantee the pattern stays inside the shirt shape.
-// Each club gets unique IDs based on club name to avoid cross-instance conflicts.
-const TEAM_KIT = {
-  "Juventus":   { p:"#1a1a1a", s:"#ffffff", style:"stripes-v" },
-  "Inter":      { p:"#003399", s:"#000000", style:"stripes-v" },
-  "Milan":      { p:"#C0392B", s:"#1a1a1a", style:"stripes-v" },
-  "Roma":       { p:"#8B0000", s:"#e8b84b", style:"solid" },
-  "Lazio":      { p:"#89CFF0", s:"#ffffff", style:"solid" },
-  "Napoli":     { p:"#009FD4", s:"#ffffff", style:"solid" },
-  "Atalanta":   { p:"#1A3A6B", s:"#000000", style:"stripes-v" },
-  "Bologna":    { p:"#C0392B", s:"#1a1a1a", style:"halves" },
-  "Fiorentina": { p:"#6A0DAD", s:"#ffffff", style:"solid" },
-  "Como":       { p:"#0047AB", s:"#ffffff", style:"solid" },
-  "Genoa":      { p:"#8B0000", s:"#1B4F72", style:"halves" },
-  "Torino":     { p:"#8B2500", s:"#ffffff", style:"solid" },
+/* ═══════════════════════════════════════════════════════════════════════════
+   KIT SVG — disegno le strisce come <rect> individuali, senza pattern/defs
+   Niente ID condivisi, niente clipPath, niente conflitti.
+   Uso un <svg> con overflow:hidden + un path per la forma.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const KITS = {
+  Juventus:{p:"#1a1a1a",s:"#fff",t:"sv"},Inter:{p:"#003399",s:"#000",t:"sv"},
+  Milan:{p:"#C0392B",s:"#1a1a1a",t:"sv"},Roma:{p:"#8B0000",s:"#e8b84b",t:"s"},
+  Lazio:{p:"#89CFF0",s:"#fff",t:"s"},Napoli:{p:"#009FD4",s:"#fff",t:"s"},
+  Atalanta:{p:"#1A3A6B",s:"#000",t:"sv"},Bologna:{p:"#C0392B",s:"#1a1a1a",t:"h"},
+  Fiorentina:{p:"#6A0DAD",s:"#fff",t:"s"},Como:{p:"#0047AB",s:"#fff",t:"s"},
+  Genoa:{p:"#8B0000",s:"#1B4F72",t:"h"},Torino:{p:"#8B2500",s:"#fff",t:"s"},
 };
 
-// Unique counter per KitSVG mount — guarantees unique SVG IDs per DOM instance
-let _kitCount = 0;
+function KitSVG({club, size=32}) {
+  const k = KITS[club] || {p:"#555",s:"#888",t:"s"};
+  const th = useContext(ThemeCtx);
+  const sk = th==="dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)";
+  // Disegno su canvas 60×72 scalato
+  const W=60, H=72;
+  // Corpo
+  const bd = `M13,10 Q30,2 47,10 L58,23 L48,28 L48,70 L12,70 L12,28 L2,23 Z`;
+  // Maniche
+  const ml = `M13,10 L2,23 L12,28 L17,17 Z`;
+  const mr = `M47,10 L58,23 L48,28 L43,17 Z`;
 
-// Shirt geometry in 100×120 viewBox
-const SB = "M22,16 Q50,4 78,16 L97,38 L80,46 L80,118 L20,118 L20,46 L3,38 Z";
-const SL = "M22,16 L3,38 L20,46 L28,28 Z";
-const SR = "M78,16 L97,38 L80,46 L72,28 Z";
-
-function KitSVG({ club, size = 32 }) {
-  // Each component instance gets its own ID namespace
-  const idRef = useRef(null);
-  if (idRef.current === null) idRef.current = ++_kitCount;
-  const u = `k${idRef.current}`;
-
-  const kit = TEAM_KIT[club] || { p:"#374151", s:"#6b7280", style:"solid" };
-  const { p: pri, s: sec, style } = kit;
-  const th = useTheme();
-  const sk = th === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.22)";
-
-  const W = 25; // stripe width (4 stripes across 100px)
+  // Per le strisce verticali: 4 rect da 15px ciascuno, alternati
+  const stripes = k.t === "sv" ? [0,1,2,3].map(i => (
+    <rect key={i} x={i*15} y={0} width={15} height={H}
+      fill={i%2===0 ? k.p : k.s}/>
+  )) : null;
 
   return (
-    <svg width={size} height={Math.round(size * 1.2)}
-      viewBox="0 0 100 120"
-      style={{ flexShrink:0, display:"block", overflow:"visible" }}>
-      <defs>
-        <clipPath id={`${u}b`}><path d={SB}/></clipPath>
-        <clipPath id={`${u}l`}><path d={SL}/></clipPath>
-        <clipPath id={`${u}r`}><path d={SR}/></clipPath>
-        {style === "stripes-v" && (
-          <pattern id={`${u}p`} x="0" y="0" width={W*2} height="120" patternUnits="userSpaceOnUse">
-            <rect x="0" width={W}   height="120" fill={pri}/>
-            <rect x={W} width={W}   height="120" fill={sec}/>
-          </pattern>
-        )}
-      </defs>
+    <svg width={size} height={Math.round(size*1.2)} viewBox={`0 0 ${W} ${H}`}
+      style={{display:"block",flexShrink:0}}>
+      {/* Sfondo maglia = forma base */}
+      <path d={bd} fill={k.p}/>
 
-      {/* Body base */}
-      <path d={SB} fill={pri}/>
-      {/* Vertical stripes clipped to body */}
-      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}b)`}/>}
-      {/* Halves */}
-      {style === "halves" && <rect x="50" y="0" width="50" height="120" fill={sec} clipPath={`url(#${u}b)`}/>}
-      {/* Body outline */}
-      <path d={SB} fill="none" stroke={sk} strokeWidth="1"/>
+      {/* Strisce verticali: disegno rect e li maschero con la forma della maglia */}
+      {/* Uso un <g> con la proprietà CSS clip-path su un path inline */}
+      {k.t === "sv" && (
+        <g style={{clipPath:`path('${bd}')`}}>
+          {stripes}
+        </g>
+      )}
 
-      {/* Sleeve L */}
-      <path d={SL} fill={sec}/>
-      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}l)`}/>}
-      <path d={SL} fill="none" stroke={sk} strokeWidth="0.8"/>
+      {/* Metà destra per halves */}
+      {k.t === "h" && (
+        <g style={{clipPath:`path('${bd}')`}}>
+          <rect x={W/2} y={0} width={W/2} height={H} fill={k.s}/>
+        </g>
+      )}
 
-      {/* Sleeve R */}
-      <path d={SR} fill={sec}/>
-      {style === "stripes-v" && <rect x="0" y="0" width="100" height="120" fill={`url(#${u}p)`} clipPath={`url(#${u}r)`}/>}
-      <path d={SR} fill="none" stroke={sk} strokeWidth="0.8"/>
+      {/* Contorno */}
+      <path d={bd} fill="none" stroke={sk} strokeWidth="0.8"/>
 
-      {/* Collar */}
-      <ellipse cx="50" cy="11" rx="9" ry="5" fill={sec} stroke={sk} strokeWidth="0.5"/>
+      {/* Maniche */}
+      <path d={ml} fill={k.s}/>
+      <path d={mr} fill={k.s}/>
+      {k.t === "sv" && <>
+        <g style={{clipPath:`path('${ml}')`}}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={H} fill={i%2===0?k.p:k.s}/>)}</g>
+        <g style={{clipPath:`path('${mr}')`}}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={H} fill={i%2===0?k.p:k.s}/>)}</g>
+      </>}
+      <path d={ml} fill="none" stroke={sk} strokeWidth="0.6"/>
+      <path d={mr} fill="none" stroke={sk} strokeWidth="0.6"/>
+
+      {/* Colletto */}
+      <ellipse cx={30} cy={7} rx={6} ry={3} fill={k.s} stroke={sk} strokeWidth="0.4"/>
     </svg>
   );
 }
-// ─── MODULE-LEVEL TOUCH DRAG STATE ──────────────────────────────────────────
-const td = { on:false, player:null, fromSlot:null, ghost:null, onDrop:null };
 
-// ─── PITCH SLOT ──────────────────────────────────────────────────────────────
-function PitchSlot({ slot, posData, player, altPlayer, onDrop, onClick, teamColor, activeStats, showKits, captain }) {
-  const [over, setOver] = useState(false);
-  const th = useTheme();
-  const T = th === "dark" ? DARK : LIGHT;
-  const color  = POSITION_COLORS[posData.role] || "#6b7280";
-  const border = teamColor || color;
-  const showRating = activeStats.includes("rating");
-  const timerRef = useRef(null);
-
-  // ── PC: HTML5 drag & drop ────────────────────────────────────────────────
-  const enterCount = useRef(0); // track nested dragenter/dragleave
-  const onDragStart = e => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/json", JSON.stringify({ player, fromSlot: slot }));
-  };
-  const onDragEnter = e => { e.preventDefault(); enterCount.current++; setOver(true); };
-  const onDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
-  const onDragLeave = e => { enterCount.current--; if (enterCount.current === 0) setOver(false); };
-  const handleDrop  = e => {
-    e.preventDefault(); enterCount.current = 0; setOver(false);
-    try { onDrop(slot, JSON.parse(e.dataTransfer.getData("application/json"))); } catch {}
-  };
-
-  // ── MOBILE: touch events (separate from pointer/drag to avoid conflicts) ─
-  const touchStart = e => {
-    if (!player) return;
-    const t = e.touches[0];
-    timerRef.current = setTimeout(() => {
-      // Start touch drag after 300ms hold
-      td.on = true; td.player = player; td.fromSlot = slot; td.onDrop = onDrop;
-      const g = document.createElement("div");
-      g.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:46px;height:46px;border-radius:50%;background:${border}55;border:3px solid ${border};display:flex;align-items:center;justify-content:center;font:800 13px 'Barlow Condensed',sans-serif;color:${color};transform:translate(-50%,-65%);box-shadow:0 4px 20px ${border}99;top:${t.clientY}px;left:${t.clientX}px;`;
-      g.textContent = initials(player.name);
-      document.body.appendChild(g);
-      td.ghost = g;
-      if (navigator.vibrate) navigator.vibrate(30);
-    }, 300);
-  };
-  const touchMove = e => {
-    clearTimeout(timerRef.current);
-    if (!td.on) return;
-    e.preventDefault(); // prevent page scroll during drag
-    const t = e.touches[0];
-    if (td.ghost) { td.ghost.style.left = t.clientX+"px"; td.ghost.style.top = t.clientY+"px"; }
-    // Highlight target slot
-    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
-    const el = document.elementFromPoint(t.clientX, t.clientY);
-    const tgt = el?.closest("[data-slot]");
-    if (tgt) tgt.style.boxShadow = `0 0 0 2px ${border}`;
-  };
-  const touchEnd = e => {
-    clearTimeout(timerRef.current);
-    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
-    if (!td.on) return;
-    if (td.ghost) { td.ghost.remove(); td.ghost = null; }
-    const t = e.changedTouches[0];
-    const el = document.elementFromPoint(t.clientX, t.clientY);
-    const tgt = el?.closest("[data-slot]");
-    if (tgt) {
-      const tgtSlot = parseInt(tgt.dataset.slot);
-      td.onDrop(tgtSlot, { player: td.player, fromSlot: td.fromSlot });
-    }
-    td.on = false; td.player = null; td.fromSlot = null; td.onDrop = null;
-  };
-  const touchCancel = e => {
-    clearTimeout(timerRef.current);
-    if (td.ghost) { td.ghost.remove(); td.ghost = null; }
-    document.querySelectorAll("[data-slot]").forEach(el => el.style.boxShadow = "");
-    td.on = false; td.player = null; td.fromSlot = null;
-  };
-
-  const slotStyle = {
-    position:"absolute", left:`${posData.x}%`, top:`${posData.y}%`,
-    transform:"translate(-50%,-50%)",
-    display:"flex", flexDirection:"column", alignItems:"center", gap:2,
-    zIndex: over ? 20 : 10,
-  };
-
-  if (!player) return (
-    <div data-slot={slot} style={slotStyle}
-      onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave}
-      onDrop={handleDrop}>
-      <div onClick={() => onClick(slot)} style={{
-        width:44, height:44, borderRadius:"50%",
-        border:`2px dashed ${color}`,
-        backgroundColor: over ? color+"33" : color+"11",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:18, color:color+"bb", cursor:"pointer",
-        transform: over ? "scale(1.15)" : "scale(1)", transition:"all 0.12s",
-      }}>+</div>
-      <div style={{ background:T.labelBg, borderRadius:4, padding:"1px 6px", fontSize:9, color, fontWeight:700 }}>{posData.role}</div>
-    </div>
-  );
-
-  return (
-    <div data-slot={slot} style={slotStyle}
-      onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave}
-      onDrop={handleDrop}>
-      {/* Avatar / Kit */}
-      <div
-        draggable
-        onDragStart={onDragStart}
-        onTouchStart={touchStart}
-        onTouchMove={touchMove}
-        onTouchEnd={touchEnd}
-        onTouchCancel={touchCancel}
-        onClick={() => onClick(slot)}
-        style={{
-          position:"relative", cursor:"grab",
-          transform: over ? "scale(1.15)" : "scale(1)", transition:"transform 0.12s",
-          userSelect:"none", WebkitUserSelect:"none", WebkitTouchCallout:"none",
-        }}>
-        {showKits ? (
-          <KitSVG club={player.club} size={40}/>
-        ) : (
-          <div style={{
-            width:44, height:44, borderRadius:"50%",
-            backgroundColor:color+"22", border:`3px solid ${border}`,
-            boxShadow:`0 0 10px ${border}55`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:13, fontWeight:800, color,
-            fontFamily:"'Barlow Condensed',sans-serif",
-          }}>{initials(player.name)}</div>
-        )}
-        {showRating && (
-          <div style={{
-            position:"absolute", top:-4, right:-4,
-            background:ratingColor(player.rating), color:"#000",
-            fontSize:8, fontWeight:800, borderRadius:3,
-            padding:"0 2px", lineHeight:"13px", minWidth:13, textAlign:"center",
-          }}>{player.rating}</div>
-        )}
-      </div>
-
-      {/* Label */}
-      <div style={{ background:T.labelBg, borderRadius:5, padding:"1px 5px", maxWidth:82, textAlign:"center" }}
-        onClick={() => onClick(slot)}>
-        <div style={{ fontSize:8, color:"#9ca3af", fontWeight:700 }}>{posData.role}</div>
-        <div style={{ fontSize:10, color:"#fff", fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-          {captain === player.id && <span style={{ color:"#ffd700", marginRight:2 }}>★</span>}
-          {player.shortName}
-        </div>
-        {altPlayer && (
-          <div style={{ fontSize:8, color:"#16a34a", fontWeight:600, borderTop:"1px solid rgba(22,163,74,0.3)", marginTop:1, paddingTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-            ↕ {altPlayer.shortName}
-          </div>
-        )}
-      </div>
-
-      {/* Stat badges */}
-      <StatBadges player={player} activeStats={activeStats}/>
-    </div>
-  );
-}
-
-// ─── STAT BADGES ─────────────────────────────────────────────────────────────
-function StatBadges({ player, activeStats }) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAT BADGES
+   ═══════════════════════════════════════════════════════════════════════════ */
+function StatBadges({player, stats}) {
   if (!player) return null;
-  const stats = STAT_VIEWS.filter(s => activeStats.includes(s.id) && s.id !== "rating" && player[s.id] !== undefined);
-  if (!stats.length) return null;
+  const items = STAT_VIEWS.filter(s=>stats.includes(s.id)&&s.id!=="rating"&&player[s.id]!==undefined);
+  if (!items.length) return null;
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:2, alignItems:"center", marginTop:2 }}>
-      {stats.slice(0, MAX_FIELD_STATS).map(sv => {
-        const exp = sv.id === "contract" && player.contract <= 2026;
-        const col = exp ? "#ef4444" : sv.color;
-        let label = sv.id === "nation" ? (NATION_FLAGS[player.nation] || player.nation)
-                  : sv.id === "foot"   ? (player.foot === "L" ? "✦ Sin" : "Dx")
-                  : `${sv.icon} ${sv.format(player[sv.id])}`;
-        return (
-          <div key={sv.id} style={{ background:col+"22", border:`1px solid ${col}66`, borderRadius:3, padding:"0 4px", fontSize:7.5, fontWeight:800, color:col, whiteSpace:"nowrap", lineHeight:"14px" }}>
-            {label}
-          </div>
-        );
+    <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"center",marginTop:2}}>
+      {items.slice(0,2).map(sv => {
+        const exp = sv.id==="contract"&&player.contract<=2026;
+        const c = exp?"#ef4444":sv.color;
+        const l = sv.id==="nation"?(NATION_FLAGS[player.nation]||player.nation)
+                 :sv.id==="foot"?(player.foot==="L"?"✦ Sin":"Dx")
+                 :`${sv.icon} ${sv.format(player[sv.id])}`;
+        return <div key={sv.id} style={{background:c+"22",border:`1px solid ${c}66`,borderRadius:3,padding:"0 4px",fontSize:7,fontWeight:800,color:c,whiteSpace:"nowrap",lineHeight:"13px"}}>{l}</div>;
       })}
     </div>
   );
 }
 
-// ─── PITCH ───────────────────────────────────────────────────────────────────
-function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamName, teamColor, activeStats, showKits, captain }) {
-  const th = useTheme();
-  const T  = th === "dark" ? DARK : LIGHT;
-  const positions = FORMATIONS[formation]?.positions || [];
+/* ═══════════════════════════════════════════════════════════════════════════
+   PITCH SLOT — drag HTML5 nativo SOLO per desktop.
+   Niente pointer events, niente touch events, niente setTimeout.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function PitchSlot({slot, pos, player, alt, onDrop, onClick, tColor, stats, kits, cap}) {
+  const [over, setOver] = useState(false);
+  const th = useContext(ThemeCtx); const T = THEMES[th];
+  const c = POSITION_COLORS[pos.role]||"#6b7280";
+  const b = tColor||c;
+  const cnt = useRef(0);
+
+  // HTML5 drag
+  const ds = e => { if(!player) return; e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain",JSON.stringify({id:player.id,slot})); };
+  const de = e => { e.preventDefault(); cnt.current++; setOver(true); };
+  const dv = e => { e.preventDefault(); };
+  const dl = () => { cnt.current--; if(cnt.current<=0){cnt.current=0;setOver(false);} };
+  const dd = e => { e.preventDefault(); cnt.current=0; setOver(false);
+    try { const d=JSON.parse(e.dataTransfer.getData("text/plain")); onDrop(slot,d); } catch{} };
+
+  const S = {position:"absolute",left:`${pos.x}%`,top:`${pos.y}%`,transform:"translate(-50%,-50%)",
+    display:"flex",flexDirection:"column",alignItems:"center",gap:2,zIndex:over?20:10};
+
+  if (!player) return (
+    <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
+      <div onClick={()=>onClick(slot)} style={{width:44,height:44,borderRadius:"50%",border:`2px dashed ${c}`,
+        backgroundColor:over?c+"33":c+"11",display:"flex",alignItems:"center",justifyContent:"center",
+        fontSize:18,color:c+"bb",cursor:"pointer",transform:over?"scale(1.15)":"scale(1)",transition:"all .12s"}}>+</div>
+      <div style={{background:T.label,borderRadius:4,padding:"1px 6px",fontSize:9,color:c,fontWeight:700}}>{pos.role}</div>
+    </div>
+  );
+
   return (
-    <div style={{ position:"relative", width:"100%", paddingBottom:"150%", userSelect:"none", WebkitUserSelect:"none", touchAction:"pan-y" }}>
-      <svg viewBox="0 0 300 450" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
-        <defs>
-          <linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={T.pitchDark}/>
-            <stop offset="100%" stopColor={T.pitchLight}/>
-          </linearGradient>
-        </defs>
+    <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
+      <div draggable onDragStart={ds} onClick={()=>onClick(slot)}
+        style={{position:"relative",cursor:"grab",transform:over?"scale(1.15)":"scale(1)",transition:"transform .12s",
+          userSelect:"none",WebkitUserSelect:"none"}}>
+        {kits ? <KitSVG club={player.club} size={40}/>
+          : <div style={{width:44,height:44,borderRadius:"50%",backgroundColor:c+"22",border:`3px solid ${b}`,
+              boxShadow:`0 0 10px ${b}55`,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:13,fontWeight:800,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{ini(player.name)}</div>}
+        {stats.includes("rating") && <div style={{position:"absolute",top:-4,right:-4,background:rc(player.rating),
+          color:"#000",fontSize:8,fontWeight:800,borderRadius:3,padding:"0 2px",lineHeight:"13px",minWidth:13,textAlign:"center"}}>{player.rating}</div>}
+      </div>
+      <div style={{background:T.label,borderRadius:5,padding:"1px 5px",maxWidth:82,textAlign:"center"}} onClick={()=>onClick(slot)}>
+        <div style={{fontSize:8,color:"#9ca3af",fontWeight:700}}>{pos.role}</div>
+        <div style={{fontSize:10,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          {cap===player.id&&<span style={{color:"#ffd700",marginRight:2}}>★</span>}{player.shortName}
+        </div>
+        {alt&&<div style={{fontSize:8,color:"#16a34a",fontWeight:600,borderTop:"1px solid rgba(22,163,74,0.3)",marginTop:1,paddingTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>↕ {alt.shortName}</div>}
+      </div>
+      <StatBadges player={player} stats={stats}/>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PITCH
+   ═══════════════════════════════════════════════════════════════════════════ */
+function PitchView({lineup, alts, form, onDrop, onClick, name, color, stats, kits, cap}) {
+  const th = useContext(ThemeCtx); const T = THEMES[th];
+  const positions = FORMATIONS[form]?.positions||[];
+  return (
+    <div style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none"}}>
+      <svg viewBox="0 0 300 450" style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
+        <defs><linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={T.pDark}/><stop offset="100%" stopColor={T.pLight}/>
+        </linearGradient></defs>
         <rect width="300" height="450" fill="url(#gf)" rx="8"/>
-        {[0,1,2,3,4,5,6,7].map(i=>(
-          <rect key={i} x="0" y={i*57} width="300" height="28"
-            fill={i%2===0?"rgba(0,0,0,0.06)":"rgba(255,255,255,0.02)"}/>
-        ))}
-        <g fill="none" stroke={T.fieldLine} strokeWidth="1.3">
+        {[0,1,2,3,4,5,6,7].map(i=><rect key={i} x="0" y={i*57} width="300" height="28" fill={i%2===0?"rgba(0,0,0,0.06)":"rgba(255,255,255,0.02)"}/>)}
+        <g fill="none" stroke={T.line} strokeWidth="1.3">
           <rect x="10" y="10" width="280" height="430" rx="2"/>
           <line x1="10" y1="225" x2="290" y2="225"/>
           <circle cx="150" cy="225" r="36"/>
-          <circle cx="150" cy="225" r="2.5" fill={T.fieldLine} stroke="none"/>
+          <circle cx="150" cy="225" r="2.5" fill={T.line} stroke="none"/>
           <rect x="56" y="350" width="188" height="80"/>
           <rect x="100" y="390" width="100" height="40"/>
           <rect x="56" y="20" width="188" height="80"/>
@@ -413,102 +200,38 @@ function Pitch({ lineup, altPlayers, formation, onSlotDrop, onSlotClick, teamNam
           <path d="M 100 122 A 36 36 0 0 0 200 122"/>
           <path d="M 100 328 A 36 36 0 0 1 200 328"/>
         </g>
-        {teamName && (
-          <text x="150" y="226" textAnchor="middle" dominantBaseline="middle"
-            fill="rgba(255,255,255,0.04)" fontSize="19"
-            fontFamily="'Barlow Condensed',sans-serif" fontWeight="900" letterSpacing="3">
-            {teamName.toUpperCase()}
-          </text>
-        )}
+        {name&&<text x="150" y="226" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="19" fontFamily="'Barlow Condensed',sans-serif" fontWeight="900" letterSpacing="3">{name.toUpperCase()}</text>}
       </svg>
-      {positions.map(pd => (
-        <PitchSlot key={pd.slot} slot={pd.slot} posData={pd}
-          player={lineup[pd.slot] || null}
-          altPlayer={altPlayers[pd.slot] ? PLAYERS.find(p=>p.id===altPlayers[pd.slot]) || null : null}
-          onDrop={onSlotDrop} onClick={onSlotClick}
-          teamColor={teamColor} activeStats={activeStats}
-          showKits={showKits} captain={captain}/>
+      {positions.map(p=>(
+        <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
+          alt={alts[p.slot]?PLAYERS.find(x=>x.id===alts[p.slot])||null:null}
+          onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap}/>
       ))}
     </div>
   );
 }
 
-// ─── EXPORT CANVAS ───────────────────────────────────────────────────────────
-function ExportCanvas({ lineup, formation, teamName, teamColor, activeStats, onDone }) {
-  const ref = useRef();
-  useEffect(() => {
-    const c = ref.current, ctx = c.getContext("2d");
-    const W=800, H=1000; c.width=W; c.height=H;
-    const bg = ctx.createLinearGradient(0,0,0,H);
-    bg.addColorStop(0,"#0a0e1a"); bg.addColorStop(1,"#111827");
-    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle=teamColor||"#16a34a"; ctx.fillRect(0,0,W,70);
-    ctx.fillStyle="#fff"; ctx.font="bold 36px sans-serif"; ctx.textAlign="center";
-    ctx.fillText(teamName.toUpperCase(),W/2,46);
-    ctx.font="16px sans-serif"; ctx.fillStyle="rgba(255,255,255,0.7)";
-    ctx.fillText(formation,W/2,65);
-    const fg=ctx.createLinearGradient(40,90,40,840);
-    fg.addColorStop(0,"#1a4d2e"); fg.addColorStop(1,"#1d5c35");
-    ctx.fillStyle=fg; ctx.beginPath(); ctx.roundRect(40,90,W-80,750,8); ctx.fill();
-    const positions=FORMATIONS[formation]?.positions||[];
-    positions.forEach(pos=>{
-      const pl=lineup[pos.slot]; if(!pl)return;
-      const px=60+(pos.x/100)*(W-120), py=100+(pos.y/100)*730;
-      const col=POSITION_COLORS[pos.role]||"#6b7280";
-      ctx.beginPath(); ctx.arc(px,py,26,0,Math.PI*2);
-      ctx.fillStyle=col+"33"; ctx.fill();
-      ctx.strokeStyle=teamColor||col; ctx.lineWidth=3; ctx.stroke();
-      ctx.fillStyle=col; ctx.font="bold 16px sans-serif"; ctx.textAlign="center";
-      ctx.fillText(initials(pl.name),px,py+6);
-      const rc=ratingColor(pl.rating);
-      ctx.fillStyle=rc; ctx.beginPath(); ctx.roundRect(px+14,py-34,24,16,3); ctx.fill();
-      ctx.fillStyle="#000"; ctx.font="bold 11px sans-serif"; ctx.fillText(pl.rating,px+26,py-22);
-      ctx.fillStyle="rgba(0,0,0,0.85)"; ctx.beginPath(); ctx.roundRect(px-36,py+29,72,22,4); ctx.fill();
-      ctx.fillStyle="#9ca3af"; ctx.font="bold 8px sans-serif"; ctx.fillText(pos.role,px,py+38);
-      ctx.fillStyle="#fff"; ctx.font="bold 10px sans-serif";
-      ctx.fillText(pl.shortName.length>10?pl.shortName.slice(0,10)+".":pl.shortName,px,py+49);
-    });
-    const filled=lineup.filter(Boolean);
-    if(filled.length){
-      const avgR=(filled.reduce((a,p)=>a+p.rating,0)/filled.length).toFixed(1);
-      ctx.fillStyle="rgba(0,0,0,0.6)"; ctx.fillRect(0,H-90,W,90);
-      [{label:"Rating medio",v:avgR,c:ratingColor(parseFloat(avgR))},
-       {label:"Valore",v:`€${filled.reduce((a,p)=>a+(p.value||0),0)}M`,c:"#16a34a"},
-       {label:"Età media",v:`${(filled.reduce((a,p)=>a+(p.age||0),0)/filled.length).toFixed(1)}a`,c:"#3b82f6"},
-       {label:"Giocatori",v:`${filled.length}/11`,c:"#9ca3af"},
-      ].forEach((s,i)=>{
-        const x=W/4*i+W/8;
-        ctx.fillStyle=s.c; ctx.font="bold 22px sans-serif"; ctx.textAlign="center"; ctx.fillText(s.v,x,H-52);
-        ctx.fillStyle="rgba(255,255,255,0.4)"; ctx.font="11px sans-serif"; ctx.fillText(s.label,x,H-32);
-      });
-    }
-    ctx.fillStyle="rgba(255,255,255,0.15)"; ctx.font="bold 13px sans-serif"; ctx.textAlign="right";
-    ctx.fillText("universosportivo.com",W-20,H-12);
-    const a=document.createElement("a"); a.download=`${teamName.replace(/\s/g,"-")}-lineup.png`;
-    a.href=c.toDataURL("image/png"); a.click(); onDone();
-  },[]);
-  return <canvas ref={ref} style={{display:"none"}}/>;
-}
-
-// ─── TEAM PICKER ─────────────────────────────────────────────────────────────
-function TeamPicker({ onSelect, onClose }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEAM PICKER
+   ═══════════════════════════════════════════════════════════════════════════ */
+function TeamPicker({onSelect, onClose}) {
+  const th = useContext(ThemeCtx); const T = THEMES[th];
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:T.panel, borderRadius:16, width:"100%", maxWidth:500, border:`1px solid ${T.panelBorder}`, maxHeight:"90vh", overflowY:"auto" }}>
-        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.panelBorder}`, display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:T.panel, zIndex:1 }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:700, color:T.text }}>Carica squadra Serie A</div>
-          <button onClick={onClose} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:20 }}>✕</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:T.panel,borderRadius:16,width:"100%",maxWidth:500,border:`1px solid ${T.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:T.panel,zIndex:1}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.text}}>Carica squadra Serie A</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:20}}>✕</button>
         </div>
-        <div style={{ padding:14, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+        <div style={{padding:14,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
           {SERIE_A_TEAMS.map(team=>(
             <button key={team.name} onClick={()=>onSelect(team)}
-              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:"12px 8px", background:T.inputBg, border:`1px solid ${team.color}44`, borderRadius:10, cursor:"pointer" }}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=team.color; e.currentTarget.style.background=team.color+"18";}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=team.color+"44"; e.currentTarget.style.background=T.inputBg;}}>
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"12px 8px",background:T.inpBg,border:`1px solid ${team.color}44`,borderRadius:10,cursor:"pointer"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=team.color;e.currentTarget.style.background=team.color+"18";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=team.color+"44";e.currentTarget.style.background=T.inpBg;}}>
               <KitSVG club={team.name} size={36}/>
-              <div style={{ fontSize:11, fontWeight:700, color:T.text, textAlign:"center" }}>{team.name}</div>
-              <div style={{ fontSize:9, color:T.textMuted }}>{team.formation} · OVR {team.rating}</div>
+              <div style={{fontSize:11,fontWeight:700,color:T.text,textAlign:"center"}}>{team.name}</div>
+              <div style={{fontSize:9,color:T.dim}}>{team.formation} · OVR {team.rating}</div>
             </button>
           ))}
         </div>
@@ -517,786 +240,516 @@ function TeamPicker({ onSelect, onClose }) {
   );
 }
 
-// ─── PLAYER SEARCH ───────────────────────────────────────────────────────────
-function PlayerSearch({ onSelectPlayer, onClose, selectedSlotRole, currentLineup, isAlt, slotPlayer }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const [query, setQuery]   = useState("");
-  const [posF,  setPosF]    = useState("ALL");
-  const [clubF, setClubF]   = useState("ALL");
-  const [minR,  setMinR]    = useState(60);
-  const [maxA,  setMaxA]    = useState(40);
-  const [maxW,  setMaxW]    = useState(10000);
-  const [maxV,  setMaxV]    = useState(300);
-  const [footF, setFootF]   = useState("ALL");
-  const [conF,  setConF]    = useState("ALL");
-  const [adv,   setAdv]     = useState(false);
-  const inputRef = useRef();
-
-  // Delayed focus to prevent mobile zoom
-  useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 350); return () => clearTimeout(t); }, []);
-
-  const posMap = { DEF:["CB","RB","LB"], MID:["DM","CM","AM","RM","LM"], ATT:["ST","RW","LW"] };
-  const clubs  = ["ALL", ...Array.from(new Set(PLAYERS.map(p=>p.club))).sort()];
-  const usedIds = new Set(currentLineup.filter(Boolean).map(p=>p.id));
-
-  const filtered = PLAYERS.filter(p => {
-    if (!isAlt && usedIds.has(p.id)) return false;
-    const q = query.toLowerCase();
-    if (query && !p.name.toLowerCase().includes(q) && !p.club.toLowerCase().includes(q)) return false;
-    if (posF !== "ALL" && !(posF==="GK"&&p.position==="GK") && !(posMap[posF]?.includes(p.position))) return false;
-    if (clubF !== "ALL" && p.club !== clubF) return false;
-    if (p.rating < minR) return false;
-    if (p.age > maxA) return false;
-    if (p.wage > maxW) return false;
-    if (p.value > maxV) return false;
-    if (footF !== "ALL" && p.foot !== footF) return false;
-    if (conF === "expiring" && p.contract > 2026) return false;
-    if (conF === "safe"     && p.contract <= 2026) return false;
+/* ═══════════════════════════════════════════════════════════════════════════
+   PLAYER SEARCH
+   ═══════════════════════════════════════════════════════════════════════════ */
+function PlayerSearch({onSelect, onClose, role, lineup}) {
+  const th = useContext(ThemeCtx); const T = THEMES[th];
+  const [q,setQ]=useState("");const [pf,setPf]=useState("ALL");const [cf,setCf]=useState("ALL");
+  const [minR,setMinR]=useState(60);const [maxA,setMaxA]=useState(40);const [footF,setFootF]=useState("ALL");
+  const [conF,setConF]=useState("ALL");const [adv,setAdv]=useState(false);
+  const ref=useRef();
+  useEffect(()=>{const t=setTimeout(()=>ref.current?.focus(),400);return()=>clearTimeout(t);},[]);
+  const PM={DEF:["CB","RB","LB"],MID:["DM","CM","AM","RM","LM"],ATT:["ST","RW","LW"]};
+  const clubs=["ALL",...new Set(PLAYERS.map(p=>p.club))];
+  const used=new Set(lineup.filter(Boolean).map(p=>p.id));
+  const list=PLAYERS.filter(p=>{
+    if(used.has(p.id))return false;
+    if(q&&!p.name.toLowerCase().includes(q.toLowerCase())&&!p.club.toLowerCase().includes(q.toLowerCase()))return false;
+    if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]?.includes(p.position)))return false;
+    if(cf!=="ALL"&&p.club!==cf)return false;
+    if(p.rating<minR)return false;
+    if(p.age>maxA&&maxA<40)return false;
+    if(footF!=="ALL"&&p.foot!==footF)return false;
+    if(conF==="exp"&&p.contract>2026)return false;
+    if(conF==="safe"&&p.contract<=2026)return false;
     return true;
-  }).sort((a,b) => b.rating - a.rating);
+  }).sort((a,b)=>b.rating-a.rating);
 
-  const inp = { background:T.inputBg, border:`1px solid ${T.inputBorder}`, color:T.text, borderRadius:6, padding:"5px 8px", fontSize:16, outline:"none" };
-  const pill = (active, onClick, label, color="#16a34a") => (
-    <button onClick={onClick} style={{ padding:"3px 9px", borderRadius:5, fontSize:10, fontWeight:700, cursor:"pointer", border:"1px solid", background:active?color:"transparent", borderColor:active?color:"rgba(128,128,128,0.3)", color:active?"#fff":T.textMuted }}>{label}</button>
-  );
+  const pill=(active,fn,label,col="#16a34a")=><button onClick={fn} style={{padding:"3px 9px",borderRadius:5,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:active?col:"transparent",borderColor:active?col:"rgba(128,128,128,0.3)",color:active?"#fff":T.dim}}>{label}</button>;
 
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:12 }}>
-      <div style={{ background:T.panel, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"92vh", display:"flex", flexDirection:"column", border:`1px solid ${T.panelBorder}` }}>
-        {/* Header */}
-        <div style={{ padding:"12px 14px", borderBottom:`1px solid ${T.panelBorder}`, flexShrink:0 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:17, fontWeight:700, color:T.text }}>
-              {isAlt ? "Alternativa" : "Scegli giocatore"}
-              {selectedSlotRole && <span style={{ marginLeft:7, fontSize:11, color:POSITION_COLORS[selectedSlotRole]||"#6b7280", background:(POSITION_COLORS[selectedSlotRole]||"#6b7280")+"22", padding:"2px 6px", borderRadius:4, fontWeight:600 }}>{selectedSlotRole}</span>}
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
+      <div style={{background:T.panel,borderRadius:16,width:"100%",maxWidth:520,maxHeight:"92vh",display:"flex",flexDirection:"column",border:`1px solid ${T.border}`}}>
+        <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:T.text}}>
+              Scegli giocatore {role&&<span style={{marginLeft:7,fontSize:11,color:POSITION_COLORS[role]||"#6b7280",background:(POSITION_COLORS[role]||"#6b7280")+"22",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{role}</span>}
             </div>
-            <button onClick={onClose} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:20 }}>✕</button>
+            <button onClick={onClose} style={{background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:20}}>✕</button>
           </div>
-          {isAlt && slotPlayer && <div style={{ background:"rgba(22,163,74,0.1)", border:"1px solid rgba(22,163,74,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:8, fontSize:11, color:"#16a34a" }}>Per: <strong>{slotPlayer.name}</strong></div>}
-          <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cerca per nome o club..."
-            style={{ ...inp, width:"100%", boxSizing:"border-box", marginBottom:7 }}/>
-          <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:6 }}>
-            {["ALL","GK","DEF","MID","ATT"].map(g => pill(posF===g, ()=>setPosF(g), g))}
-            <button onClick={()=>setAdv(s=>!s)} style={{ marginLeft:"auto", padding:"3px 9px", borderRadius:5, fontSize:10, fontWeight:700, cursor:"pointer", border:"1px solid", background:adv?"rgba(99,102,241,0.2)":"transparent", borderColor:adv?"#6366f1":"rgba(128,128,128,0.3)", color:adv?"#6366f1":T.textMuted }}>⚙ Filtri {adv?"▲":"▼"}</button>
+          <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca per nome o club..."
+            style={{width:"100%",background:T.inpBg,border:`1px solid ${T.inpBd}`,borderRadius:7,padding:"7px 11px",color:T.text,fontSize:16,outline:"none",boxSizing:"border-box",marginBottom:7}}/>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+            {["ALL","GK","DEF","MID","ATT"].map(g=>pill(pf===g,()=>setPf(g),g))}
+            <button onClick={()=>setAdv(s=>!s)} style={{marginLeft:"auto",padding:"3px 9px",borderRadius:5,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:adv?"rgba(99,102,241,0.2)":"transparent",borderColor:adv?"#6366f1":"rgba(128,128,128,0.3)",color:adv?"#6366f1":T.dim}}>⚙ Filtri {adv?"▲":"▼"}</button>
           </div>
-          {adv && (
-            <div style={{ background:T.inputBg, borderRadius:8, padding:"10px 12px", display:"flex", flexDirection:"column", gap:8 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:10, color:T.textMuted, width:64 }}>Squadra</span>
-                <select value={clubF} onChange={e=>setClubF(e.target.value)} style={{ ...inp, flex:1, fontSize:11 }}>
-                  {clubs.map(c=><option key={c} value={c}>{c==="ALL"?"Tutte":c}</option>)}
-                </select>
-              </div>
-              {[
-                {label:"Rating min",val:minR,set:setMinR,min:60,max:90,step:1,color:"#ffd700",fmt:v=>v},
-                {label:"Età max",val:maxA,set:setMaxA,min:18,max:40,step:1,color:"#3b82f6",fmt:v=>v>=40?"∞":v+"a"},
-                {label:"Stip. max",val:maxW,set:setMaxW,min:0,max:10000,step:500,color:"#f59e0b",fmt:v=>v>=10000?"∞":`€${v}K`},
-                {label:"Valore max",val:maxV,set:setMaxV,min:0,max:300,step:10,color:"#16a34a",fmt:v=>v>=300?"∞":`€${v}M`},
-              ].map(s=>(
-                <div key={s.label} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <span style={{ fontSize:10, color:T.textMuted, width:64, flexShrink:0 }}>{s.label}</span>
-                  <input type="range" min={s.min} max={s.max} step={s.step} value={s.val} onChange={e=>s.set(+e.target.value)} style={{ flex:1, accentColor:s.color }}/>
-                  <span style={{ fontSize:11, fontWeight:800, color:s.color, width:44, textAlign:"right" }}>{s.fmt(s.val)}</span>
-                </div>
-              ))}
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:10, color:T.textMuted, width:64 }}>Piede</span>
-                <div style={{ display:"flex", gap:4 }}>
-                  {[["ALL","Tutti"],["R","Destro"],["L","Mancino"]].map(([v,l])=>pill(footF===v,()=>setFootF(v),l,"#ec4899"))}
-                </div>
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:10, color:T.textMuted, width:64 }}>Contratto</span>
-                <div style={{ display:"flex", gap:4 }}>
-                  {[["ALL","Tutti"],["expiring","In scadenza"],["safe","Sicuri"]].map(([v,l])=>pill(conF===v,()=>setConF(v),l,"#f97316"))}
-                </div>
-              </div>
+          {adv&&<div style={{background:T.inpBg,borderRadius:8,padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:T.dim,width:64}}>Squadra</span>
+              <select value={cf} onChange={e=>setCf(e.target.value)} style={{flex:1,background:T.inpBg,border:`1px solid ${T.inpBd}`,borderRadius:5,padding:"4px 8px",color:T.dim,fontSize:11,outline:"none"}}>
+                {clubs.map(c=><option key={c} value={c}>{c==="ALL"?"Tutte":c}</option>)}
+              </select>
             </div>
-          )}
-          <div style={{ fontSize:10, color:T.textMuted, textAlign:"right", marginTop:4 }}>{filtered.length} giocatori</div>
+            {[{l:"Rating min",v:minR,s:setMinR,mn:60,mx:90,st:1,cl:"#ffd700",f:v=>v},
+              {l:"Età max",v:maxA,s:setMaxA,mn:18,mx:40,st:1,cl:"#3b82f6",f:v=>v>=40?"∞":v+"a"},
+            ].map(x=><div key={x.l} style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:T.dim,width:64}}>{x.l}</span>
+              <input type="range" min={x.mn} max={x.mx} step={x.st} value={x.v} onChange={e=>x.s(+e.target.value)} style={{flex:1,accentColor:x.cl}}/>
+              <span style={{fontSize:11,fontWeight:800,color:x.cl,width:36,textAlign:"right"}}>{x.f(x.v)}</span>
+            </div>)}
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:T.dim,width:64}}>Piede</span>
+              {[["ALL","Tutti"],["R","Destro"],["L","Mancino"]].map(([v,l])=>pill(footF===v,()=>setFootF(v),l,"#ec4899"))}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:T.dim,width:64}}>Contratto</span>
+              {[["ALL","Tutti"],["exp","In scadenza"],["safe","Sicuri"]].map(([v,l])=>pill(conF===v,()=>setConF(v),l,"#f97316"))}
+            </div>
+          </div>}
+          <div style={{fontSize:10,color:T.dim,textAlign:"right",marginTop:4}}>{list.length} giocatori</div>
         </div>
-        {/* List */}
-        <div style={{ overflowY:"auto", flex:1 }}>
-          {filtered.length === 0
-            ? <div style={{ padding:28, textAlign:"center", color:T.textMuted }}>Nessun giocatore trovato</div>
-            : filtered.map(p => {
-              const exp = p.contract <= 2026;
-              return (
-                <div key={p.id} onClick={()=>onSelectPlayer(p)}
-                  style={{ display:"flex", alignItems:"center", gap:9, padding:"7px 14px", cursor:"pointer", borderBottom:`1px solid ${T.panelBorder}` }}
-                  onMouseEnter={e=>e.currentTarget.style.background=T.inputBg}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <KitSVG club={p.club} size={26}/>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:T.text }}>
-                      {p.name} <span style={{ fontSize:11 }}>{NATION_FLAGS[p.nation]||""}</span>
-                      {p.foot==="L"&&<span style={{ fontSize:9, color:"#ec4899", marginLeft:4 }}>✦</span>}
-                    </div>
-                    <div style={{ fontSize:10, color:T.textMuted }}>
-                      {p.club} · {p.age}a · €{p.value}M
-                      {exp&&<span style={{ color:"#ef4444", marginLeft:5 }}>⚠{p.contract}</span>}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:9, color:POSITION_COLORS[p.position]||"#6b7280", background:(POSITION_COLORS[p.position]||"#6b7280")+"22", padding:"1px 5px", borderRadius:3, fontWeight:700 }}>{p.position}</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:ratingColor(p.rating), width:24, textAlign:"right" }}>{p.rating}</div>
-                </div>
-              );
-            })
-          }
+        <div style={{overflowY:"auto",flex:1}}>
+          {list.length===0?<div style={{padding:28,textAlign:"center",color:T.dim}}>Nessun giocatore trovato</div>
+          :list.map(p=>{const exp=p.contract<=2026;return(
+            <div key={p.id} onClick={()=>onSelect(p)} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 14px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e=>e.currentTarget.style.background=T.inpBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <KitSVG club={p.club} size={26}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:T.text}}>{p.name} <span style={{fontSize:11}}>{NATION_FLAGS[p.nation]||""}</span>{p.foot==="L"&&<span style={{fontSize:9,color:"#ec4899",marginLeft:4}}>✦</span>}</div>
+                <div style={{fontSize:10,color:T.dim}}>{p.club} · {p.age}a · €{p.value}M{exp&&<span style={{color:"#ef4444",marginLeft:5}}>⚠{p.contract}</span>}</div>
+              </div>
+              <div style={{fontSize:9,color:POSITION_COLORS[p.position]||"#6b7280",background:(POSITION_COLORS[p.position]||"#6b7280")+"22",padding:"1px 5px",borderRadius:3,fontWeight:700}}>{p.position}</div>
+              <div style={{fontSize:13,fontWeight:800,color:rc(p.rating),width:24,textAlign:"right"}}>{p.rating}</div>
+            </div>
+          );})}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── SETTINGS ────────────────────────────────────────────────────────────────
-function TeamSettings({ teamName, setTeamName, teamColor, setTeamColor, formation, setFormation, onOpenTeamPicker, showKits, setShowKits }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const colors = ["#16a34a","#2563eb","#dc2626","#d97706","#7c3aed","#db2777","#0891b2","#e5e7eb","#000000","#8B2500"];
-  const categories = [...new Set(Object.values(FORMATIONS).map(f=>f.category))];
-  const p = (style) => ({ ...style });
-  return (
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, overflow:"hidden" }}>
-      <button onClick={onOpenTeamPicker} style={{ width:"100%", padding:"10px 12px", background:"rgba(22,163,74,0.12)", border:"none", borderBottom:`1px solid ${T.panelBorder}`, color:"#16a34a", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-        🏟️ Carica squadra Serie A
-      </button>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, letterSpacing:"1px", textTransform:"uppercase", marginBottom:4 }}>Nome squadra</div>
-        <input value={teamName} onChange={e=>setTeamName(e.target.value)} placeholder="La tua squadra..." maxLength={24}
-          style={{ width:"100%", background:T.inputBg, border:`1px solid ${T.inputBorder}`, borderRadius:7, padding:"6px 9px", color:T.text, fontSize:16, outline:"none", boxSizing:"border-box" }}/>
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETTINGS, LINEUP LIST, BENCH, STATS, COMPARE — pannelli laterali
+   ═══════════════════════════════════════════════════════════════════════════ */
+function Settings({name,setName,color,setColor,form,setForm,kits,setKits,onPick}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  const colors=["#16a34a","#2563eb","#dc2626","#d97706","#7c3aed","#db2777","#0891b2","#e5e7eb","#000","#8B2500"];
+  const cats=[...new Set(Object.values(FORMATIONS).map(f=>f.category))];
+  return(
+    <div style={{background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden"}}>
+      <button onClick={onPick} style={{width:"100%",padding:"10px 12px",background:"rgba(22,163,74,0.12)",border:"none",borderBottom:`1px solid ${T.border}`,color:"#16a34a",fontSize:12,fontWeight:700,cursor:"pointer"}}>🏟️ Carica squadra Serie A</button>
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:T.dim,letterSpacing:"1px",textTransform:"uppercase",marginBottom:4}}>Nome squadra</div>
+        <input value={name} onChange={e=>setName(e.target.value)} maxLength={24}
+          style={{width:"100%",background:T.inpBg,border:`1px solid ${T.inpBd}`,borderRadius:7,padding:"6px 9px",color:T.text,fontSize:16,outline:"none",boxSizing:"border-box"}}/>
       </div>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, letterSpacing:"1px", textTransform:"uppercase", marginBottom:4 }}>Colore kit</div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-          {colors.map(c=><div key={c} onClick={()=>setTeamColor(c)} style={{ width:18, height:18, borderRadius:"50%", backgroundColor:c, cursor:"pointer", border:teamColor===c?"2.5px solid "+(th==="dark"?"#fff":"#333"):"2px solid rgba(128,128,128,0.3)", boxShadow:teamColor===c?`0 0 5px ${c}`:"none" }}/>)}
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:T.dim,letterSpacing:"1px",textTransform:"uppercase",marginBottom:4}}>Colore</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {colors.map(c=><div key={c} onClick={()=>setColor(c)} style={{width:18,height:18,borderRadius:"50%",backgroundColor:c,cursor:"pointer",border:color===c?`2.5px solid ${th==="dark"?"#fff":"#333"}`:"2px solid rgba(128,128,128,0.3)"}}/>)}
         </div>
       </div>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, letterSpacing:"1px", textTransform:"uppercase", marginBottom:4 }}>Modulo</div>
-        {categories.map(cat=>(
-          <div key={cat} style={{ marginBottom:6 }}>
-            <div style={{ fontSize:8, color:T.textFaint, fontWeight:700, letterSpacing:"0.8px", marginBottom:3, textTransform:"uppercase" }}>{cat}</div>
-            <div style={{ display:"flex", gap:3, flexWrap:"wrap" }}>
-              {Object.entries(FORMATIONS).filter(([,f])=>f.category===cat).map(([key])=>(
-                <button key={key} onClick={()=>setFormation(key)} style={{ padding:"2px 6px", borderRadius:4, fontSize:9, fontWeight:700, cursor:"pointer", border:"1px solid", background:formation===key?teamColor:"transparent", borderColor:formation===key?teamColor:"rgba(128,128,128,0.3)", color:formation===key?(teamColor==="#e5e7eb"?"#000":"#fff"):T.textMuted }}>{key}</button>
-              ))}
-            </div>
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:T.dim,letterSpacing:"1px",textTransform:"uppercase",marginBottom:4}}>Modulo</div>
+        {cats.map(cat=><div key={cat} style={{marginBottom:6}}>
+          <div style={{fontSize:8,color:T.faint,fontWeight:700,marginBottom:3,textTransform:"uppercase"}}>{cat}</div>
+          <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+            {Object.entries(FORMATIONS).filter(([,f])=>f.category===cat).map(([k])=>(
+              <button key={k} onClick={()=>setForm(k)} style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,cursor:"pointer",border:"1px solid",background:form===k?color:"transparent",borderColor:form===k?color:"rgba(128,128,128,0.3)",color:form===k?(color==="#e5e7eb"?"#000":"#fff"):T.dim}}>{k}</button>
+            ))}
           </div>
-        ))}
+        </div>)}
       </div>
-      <div style={{ padding:"8px 12px" }}>
-        <button onClick={()=>setShowKits(s=>!s)} style={{ width:"100%", padding:"6px", borderRadius:6, border:`1px solid ${showKits?"#16a34a":"rgba(128,128,128,0.3)"}`, background:showKits?"rgba(22,163,74,0.1)":"transparent", color:showKits?"#16a34a":T.textMuted, fontSize:11, fontWeight:600, cursor:"pointer" }}>
-          {showKits ? "✓ Kit abilitati" : "⚽ Mostra kit squadre"}
+      <div style={{padding:"8px 12px"}}>
+        <button onClick={()=>setKits(s=>!s)} style={{width:"100%",padding:"6px",borderRadius:6,border:`1px solid ${kits?"#16a34a":"rgba(128,128,128,0.3)"}`,background:kits?"rgba(22,163,74,0.1)":"transparent",color:kits?"#16a34a":T.dim,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+          {kits?"✓ Kit abilitati":"⚽ Mostra kit"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── STAT SELECTOR ───────────────────────────────────────────────────────────
-function StatSelector({ activeStats, setActiveStats }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const toggle = id => setActiveStats(prev => prev.includes(id) ? prev.filter(s=>s!==id) : [...prev, id]);
-  const nonRating = activeStats.filter(s=>s!=="rating").length;
-  return (
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, padding:"9px 12px" }}>
-      <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, letterSpacing:"1px", textTransform:"uppercase", marginBottom:6 }}>
-        Info visibili <span style={{ fontSize:8, fontWeight:400 }}>(max {MAX_FIELD_STATS} extra)</span>
-      </div>
-      {STAT_VIEWS.map(sv => {
-        const active = activeStats.includes(sv.id);
-        const blocked = !active && sv.id !== "rating" && nonRating >= MAX_FIELD_STATS;
-        return (
-          <button key={sv.id} onClick={()=>{ if (!blocked) toggle(sv.id); }}
-            style={{ display:"flex", alignItems:"center", gap:7, padding:"5px 9px", borderRadius:6, border:`1px solid ${active?sv.color:T.panelBorder}`, background:active?sv.color+"18":"transparent", cursor:blocked?"not-allowed":"pointer", textAlign:"left", width:"100%", marginBottom:3, opacity:blocked?0.4:1 }}>
-            <span style={{ fontSize:12 }}>{sv.icon}</span>
-            <span style={{ fontSize:10, fontWeight:600, color:active?sv.color:T.textMuted, flex:1 }}>{sv.label}</span>
-            <div style={{ width:13, height:13, borderRadius:3, background:active?sv.color:"transparent", border:`1.5px solid ${active?sv.color:T.textFaint}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, color:"#000" }}>{active?"✓":""}</div>
-          </button>
-        );
-      })}
+function StatSel({stats,setStats}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  const toggle=id=>setStats(p=>p.includes(id)?p.filter(s=>s!==id):[...p,id]);
+  const nr=stats.filter(s=>s!=="rating").length;
+  return(
+    <div style={{background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,padding:"9px 12px"}}>
+      <div style={{fontSize:9,fontWeight:700,color:T.dim,letterSpacing:"1px",textTransform:"uppercase",marginBottom:6}}>Info visibili</div>
+      {STAT_VIEWS.map(sv=>{const a=stats.includes(sv.id);const bl=!a&&sv.id!=="rating"&&nr>=2;return(
+        <button key={sv.id} onClick={()=>{if(!bl)toggle(sv.id);}} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 9px",borderRadius:6,border:`1px solid ${a?sv.color:T.border}`,background:a?sv.color+"18":"transparent",cursor:bl?"not-allowed":"pointer",width:"100%",marginBottom:3,opacity:bl?0.4:1}}>
+          <span style={{fontSize:12}}>{sv.icon}</span>
+          <span style={{fontSize:10,fontWeight:600,color:a?sv.color:T.dim,flex:1}}>{sv.label}</span>
+          <div style={{width:13,height:13,borderRadius:3,background:a?sv.color:"transparent",border:`1.5px solid ${a?sv.color:T.faint}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#000"}}>{a?"✓":""}</div>
+        </button>
+      );})}
     </div>
   );
 }
 
-// ─── COMPARE HEADER ──────────────────────────────────────────────────────────
-function CompareHeader({ team1, team2, lineup1, lineup2 }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const avg=(lu,k)=>{const f=lu.filter(Boolean);return f.length?f.reduce((a,p)=>a+(p[k]||0),0)/f.length:0;};
-  const sum=(lu,k)=>lu.filter(Boolean).reduce((a,p)=>a+(p[k]||0),0);
-  const metrics=[
-    {label:"Rating",a:avg(lineup1,"rating").toFixed(1),b:avg(lineup2,"rating").toFixed(1),nA:avg(lineup1,"rating"),nB:avg(lineup2,"rating"),hib:true},
-    {label:"Età media",a:avg(lineup1,"age").toFixed(1)+"a",b:avg(lineup2,"age").toFixed(1)+"a",nA:avg(lineup1,"age"),nB:avg(lineup2,"age"),hib:false},
-    {label:"Valore",a:`€${sum(lineup1,"value")}M`,b:`€${sum(lineup2,"value")}M`,nA:sum(lineup1,"value"),nB:sum(lineup2,"value"),hib:true},
-    {label:"Stipendi/a",a:`€${sum(lineup1,"wage").toLocaleString("it-IT")}K`,b:`€${sum(lineup2,"wage").toLocaleString("it-IT")}K`,nA:sum(lineup1,"wage"),nB:sum(lineup2,"wage"),hib:true},
-  ];
-  return (
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, padding:"11px 14px", marginBottom:10 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:6, alignItems:"center", marginBottom:9 }}>
-        <div style={{ textAlign:"center" }}><div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:900, color:team1.color }}>{team1.name||"A"}</div><div style={{ fontSize:9, color:T.textMuted }}>{lineup1.filter(Boolean).length}/11</div></div>
-        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:17, fontWeight:900, color:T.textFaint }}>VS</div>
-        <div style={{ textAlign:"center" }}><div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:900, color:team2.color }}>{team2.name||"B"}</div><div style={{ fontSize:9, color:T.textMuted }}>{lineup2.filter(Boolean).length}/11</div></div>
+function LineupList({lineup,alts,form,onRemove,onRemoveAlt,onSlot,stats,cap,setCap}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  const positions=FORMATIONS[form]?.positions||[];
+  const sh=STAT_VIEWS.filter(s=>stats.includes(s.id)&&s.id!=="rating");
+  return(
+    <div style={{background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden"}}>
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:T.text}}>XI ({lineup.filter(Boolean).length}/11)</span>
       </div>
-      {metrics.map(m=>{
-        const aW=m.hib?m.nA>m.nB:m.nA<m.nB, bW=m.hib?m.nB>m.nA:m.nB<m.nA;
-        return(<div key={m.label} style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:4, alignItems:"center", marginBottom:4 }}>
-          <div style={{ textAlign:"right", fontSize:11, fontWeight:700, color:aW?team1.color:T.textMuted }}>{m.a}</div>
-          <div style={{ fontSize:9, color:T.textMuted, textAlign:"center", minWidth:60 }}>{m.label}</div>
-          <div style={{ textAlign:"left", fontSize:11, fontWeight:700, color:bW?team2.color:T.textMuted }}>{m.b}</div>
-        </div>);
-      })}
-    </div>
-  );
-}
-
-// ─── LINEUP PANEL ────────────────────────────────────────────────────────────
-function LineupPanel({ lineup, altPlayers, formation, onRemovePlayer, onRemoveAlt, onClickSlot, activeStats, captain, onSetCaptain }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const positions = FORMATIONS[formation]?.positions || [];
-  const shownStats = STAT_VIEWS.filter(s=>activeStats.includes(s.id)&&s.id!=="rating");
-  return (
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, overflow:"hidden" }}>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:700, color:T.text }}>XI ({lineup.filter(Boolean).length}/11)</span>
-      </div>
-      <div style={{ maxHeight:480, overflowY:"auto" }}>
+      <div style={{maxHeight:480,overflowY:"auto"}}>
         {positions.map(pos=>{
-          const player=lineup[pos.slot];
-          const alt=altPlayers[pos.slot]?PLAYERS.find(p=>p.id===altPlayers[pos.slot]):null;
-          const rc=POSITION_COLORS[pos.role]||"#6b7280";
-          const exp=player&&player.contract<=2026;
-          return(
-            <div key={pos.slot} style={{ borderBottom:`1px solid ${T.panelBorder}` }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:player?"default":"pointer", minHeight:34 }}
-                onClick={()=>{ if (!player) onClickSlot(pos.slot); }}>
-                <div style={{ width:24, fontSize:8, fontWeight:700, color:rc, background:rc+"22", borderRadius:3, textAlign:"center", padding:"2px", flexShrink:0 }}>{pos.role}</div>
-                {player ? (
-                  <>
-                    <KitSVG club={player.club} size={22}/>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                        {captain===player.id&&<span style={{ color:"#ffd700", marginRight:2 }}>★</span>}
-                        {player.shortName}
-                        {player.foot==="L"&&<span style={{ fontSize:8, color:"#ec4899", marginLeft:2 }}>✦</span>}
-                        {exp&&<span style={{ fontSize:8, color:"#ef4444", marginLeft:2 }}>⚠{player.contract}</span>}
-                      </div>
-                      {shownStats.length>0&&<div style={{ display:"flex", gap:3, flexWrap:"wrap" }}>
-                        {shownStats.map(sv=>player[sv.id]!==undefined&&<span key={sv.id} style={{ fontSize:8, color:sv.id==="contract"&&exp?"#ef4444":sv.color, fontWeight:700 }}>{sv.id==="nation"?NATION_FLAGS[player.nation]||player.nation:sv.id==="foot"?(player.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(player[sv.id])}`}</span>)}
-                      </div>}
-                    </div>
-                    {activeStats.includes("rating")&&<div style={{ fontSize:10, fontWeight:800, color:ratingColor(player.rating), flexShrink:0 }}>{player.rating}</div>}
-                    <button onClick={e=>{e.stopPropagation();onSetCaptain(player.id);}} style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, color:captain===player.id?"#ffd700":T.textFaint, padding:2, flexShrink:0 }}>★</button>
-                    <button onClick={e=>{e.stopPropagation();onRemovePlayer(pos.slot);}} style={{ background:"none", border:"none", color:T.textFaint, cursor:"pointer", fontSize:11, padding:2, flexShrink:0 }}>✕</button>
-                  </>
-                ) : <div style={{ fontSize:10, color:T.textFaint, fontStyle:"italic", display:"flex", alignItems:"center", gap:5 }}><span style={{ fontSize:14, color:rc+"66" }}>+</span>Aggiungi {pos.role}</div>}
-              </div>
-              {alt&&<div style={{ display:"flex", alignItems:"center", gap:6, padding:"3px 10px 4px 36px", background:"rgba(22,163,74,0.06)" }}>
-                <span style={{ fontSize:9, color:"#16a34a", fontWeight:700, width:24, textAlign:"center" }}>↕</span>
-                <KitSVG club={alt.club} size={18}/>
-                <div style={{ flex:1, fontSize:10, color:"#16a34a", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{alt.shortName}</div>
-                <div style={{ fontSize:9, fontWeight:800, color:ratingColor(alt.rating) }}>{alt.rating}</div>
-                <button onClick={()=>onRemoveAlt(pos.slot)} style={{ background:"none", border:"none", color:T.textFaint, cursor:"pointer", fontSize:10 }}>✕</button>
-              </div>}
+          const p=lineup[pos.slot];const alt=alts[pos.slot]?PLAYERS.find(x=>x.id===alts[pos.slot]):null;
+          const rc2=POSITION_COLORS[pos.role]||"#6b7280";
+          return(<div key={pos.slot} style={{borderBottom:`1px solid ${T.border}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",cursor:p?"default":"pointer",minHeight:34}}
+              onClick={()=>{if(!p)onSlot(pos.slot);}}>
+              <div style={{width:24,fontSize:8,fontWeight:700,color:rc2,background:rc2+"22",borderRadius:3,textAlign:"center",padding:"2px",flexShrink:0}}>{pos.role}</div>
+              {p?<>
+                <KitSVG club={p.club} size={22}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,fontWeight:700,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {cap===p.id&&<span style={{color:"#ffd700",marginRight:2}}>★</span>}{p.shortName}
+                    {p.foot==="L"&&<span style={{fontSize:8,color:"#ec4899",marginLeft:2}}>✦</span>}
+                    {p.contract<=2026&&<span style={{fontSize:8,color:"#ef4444",marginLeft:2}}>⚠{p.contract}</span>}
+                  </div>
+                  {sh.length>0&&<div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+                    {sh.map(sv=>p[sv.id]!==undefined&&<span key={sv.id} style={{fontSize:8,color:sv.id==="contract"&&p.contract<=2026?"#ef4444":sv.color,fontWeight:700}}>{sv.id==="nation"?NATION_FLAGS[p.nation]||p.nation:sv.id==="foot"?(p.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(p[sv.id])}`}</span>)}
+                  </div>}
+                </div>
+                {stats.includes("rating")&&<div style={{fontSize:10,fontWeight:800,color:rc(p.rating),flexShrink:0}}>{p.rating}</div>}
+                <button onClick={e=>{e.stopPropagation();setCap(p.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:cap===p.id?"#ffd700":T.faint,padding:2,flexShrink:0}}>★</button>
+                <button onClick={e=>{e.stopPropagation();onRemove(pos.slot);}} style={{background:"none",border:"none",color:T.faint,cursor:"pointer",fontSize:11,padding:2,flexShrink:0}}>✕</button>
+              </>
+              :<div style={{fontSize:10,color:T.faint,fontStyle:"italic",display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:14,color:rc2+"66"}}>+</span>Aggiungi {pos.role}</div>}
             </div>
-          );
+            {alt&&<div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px 4px 36px",background:"rgba(22,163,74,0.06)"}}>
+              <span style={{fontSize:9,color:"#16a34a",fontWeight:700,width:24,textAlign:"center"}}>↕</span>
+              <KitSVG club={alt.club} size={18}/>
+              <div style={{flex:1,fontSize:10,color:"#16a34a",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{alt.shortName}</div>
+              <div style={{fontSize:9,fontWeight:800,color:rc(alt.rating)}}>{alt.rating}</div>
+              <button onClick={()=>onRemoveAlt(pos.slot)} style={{background:"none",border:"none",color:T.faint,cursor:"pointer",fontSize:10}}>✕</button>
+            </div>}
+          </div>);
         })}
       </div>
     </div>
   );
 }
 
-// ─── BENCH PANEL ─────────────────────────────────────────────────────────────
-function BenchPanel({ benchPlayers, lineup, altPlayers, onSetAlt, activeStats, captain, onSetCaptain }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const [sortBy, setSortBy] = useState("rating");
-  const shownStats = STAT_VIEWS.filter(s=>activeStats.includes(s.id)&&s.id!=="rating");
-  const starterIds = new Set(lineup.filter(Boolean).map(p=>p.id));
-  const bench = benchPlayers.filter(p=>!starterIds.has(p.id)).sort((a,b)=>{
-    if(sortBy==="rating")return b.rating-a.rating;
-    if(sortBy==="age")return a.age-b.age;
-    if(sortBy==="value")return b.value-a.value;
-    if(sortBy==="wage")return b.wage-a.wage;
-    return 0;
-  });
-  return (
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, overflow:"hidden" }}>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, color:T.text }}>Rosa ({bench.length})</div>
-          <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ background:T.inputBg, border:`1px solid ${T.inputBorder}`, borderRadius:5, padding:"2px 6px", color:T.textMuted, fontSize:10, outline:"none" }}>
-            <option value="rating">Rating ↓</option>
-            <option value="age">Età ↑</option>
-            <option value="value">Valore ↓</option>
-            <option value="wage">Stipendio ↓</option>
+function BenchPanel({bench,lineup,alts,onSetAlt,stats,cap,setCap}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  const [sort,setSort]=useState("rating");
+  const sh=STAT_VIEWS.filter(s=>stats.includes(s.id)&&s.id!=="rating");
+  const ids=new Set(lineup.filter(Boolean).map(p=>p.id));
+  const list=bench.filter(p=>!ids.has(p.id)).sort((a,b)=>sort==="rating"?b.rating-a.rating:sort==="age"?a.age-b.age:sort==="value"?b.value-a.value:b.wage-a.wage);
+  return(
+    <div style={{background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden"}}>
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:T.text}}>Rosa ({list.length})</div>
+          <select value={sort} onChange={e=>setSort(e.target.value)} style={{background:T.inpBg,border:`1px solid ${T.inpBd}`,borderRadius:5,padding:"2px 6px",color:T.dim,fontSize:10,outline:"none"}}>
+            <option value="rating">Rating ↓</option><option value="age">Età ↑</option><option value="value">Valore ↓</option><option value="wage">Stipendio ↓</option>
           </select>
         </div>
-        <div style={{ fontSize:9, color:T.textFaint, marginTop:2 }}>Clicca → alt ↕ · ★ → capitano</div>
+        <div style={{fontSize:9,color:T.faint,marginTop:2}}>Clicca → alternativa ↕</div>
       </div>
-      <div style={{ overflowY:"auto", maxHeight:500 }}>
-        {bench.length===0&&<div style={{ padding:20, color:T.textFaint, fontSize:12, textAlign:"center" }}>Carica una squadra</div>}
-        {bench.map(p=>{
-          const rc=POSITION_COLORS[p.position]||"#6b7280";
-          const isAlt=Object.values(altPlayers).includes(p.id);
-          const exp=p.contract<=2026;
-          return(
-            <div key={p.id} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", borderBottom:`1px solid ${T.panelBorder}`, cursor:"pointer" }}
-              onMouseEnter={e=>e.currentTarget.style.background=T.inputBg}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <div style={{ width:22, fontSize:8, fontWeight:700, color:rc, background:rc+"22", borderRadius:3, textAlign:"center", padding:"2px", flexShrink:0 }}>{p.position}</div>
-              <div onClick={()=>onSetAlt(p)} style={{ flexShrink:0 }}><KitSVG club={p.club} size={22}/></div>
-              <div onClick={()=>onSetAlt(p)} style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:isAlt?"#16a34a":T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  {captain===p.id&&<span style={{ color:"#ffd700", marginRight:2 }}>★</span>}
-                  {p.shortName}
-                  {p.foot==="L"&&<span style={{ fontSize:8, color:"#ec4899", marginLeft:2 }}>✦</span>}
-                  {exp&&<span style={{ fontSize:8, color:"#ef4444", marginLeft:2 }}>⚠{p.contract}</span>}
-                  {isAlt&&<span style={{ fontSize:8, color:"#16a34a", marginLeft:2 }}>↕</span>}
-                </div>
-                {shownStats.length>0&&<div style={{ display:"flex", gap:3 }}>
-                  {shownStats.map(sv=>p[sv.id]!==undefined&&<span key={sv.id} style={{ fontSize:8, color:sv.id==="contract"&&exp?"#ef4444":sv.color, fontWeight:700 }}>{sv.id==="nation"?NATION_FLAGS[p.nation]||p.nation:sv.id==="foot"?(p.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(p[sv.id])}`}</span>)}
-                </div>}
+      <div style={{overflowY:"auto",maxHeight:500}}>
+        {list.length===0&&<div style={{padding:20,color:T.faint,fontSize:12,textAlign:"center"}}>Carica una squadra</div>}
+        {list.map(p=>{const isA=Object.values(alts).includes(p.id);const exp=p.contract<=2026;return(
+          <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderBottom:`1px solid ${T.border}`,cursor:"pointer"}}
+            onMouseEnter={e=>e.currentTarget.style.background=T.inpBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <div style={{width:22,fontSize:8,fontWeight:700,color:POSITION_COLORS[p.position]||"#6b7280",background:(POSITION_COLORS[p.position]||"#6b7280")+"22",borderRadius:3,textAlign:"center",padding:"2px",flexShrink:0}}>{p.position}</div>
+            <div onClick={()=>onSetAlt(p)} style={{flexShrink:0}}><KitSVG club={p.club} size={22}/></div>
+            <div onClick={()=>onSetAlt(p)} style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:700,color:isA?"#16a34a":T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {cap===p.id&&<span style={{color:"#ffd700",marginRight:2}}>★</span>}{p.shortName}
+                {p.foot==="L"&&<span style={{fontSize:8,color:"#ec4899",marginLeft:2}}>✦</span>}
+                {exp&&<span style={{fontSize:8,color:"#ef4444",marginLeft:2}}>⚠{p.contract}</span>}
+                {isA&&<span style={{fontSize:8,color:"#16a34a",marginLeft:2}}>↕</span>}
               </div>
-              <button onClick={()=>onSetCaptain(p.id)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:12, color:captain===p.id?"#ffd700":T.textFaint, padding:2, flexShrink:0 }}>★</button>
-              <div style={{ fontSize:10, fontWeight:800, color:ratingColor(p.rating), flexShrink:0 }}>{p.rating}</div>
+              {sh.length>0&&<div style={{display:"flex",gap:3}}>{sh.map(sv=>p[sv.id]!==undefined&&<span key={sv.id} style={{fontSize:8,color:sv.id==="contract"&&exp?"#ef4444":sv.color,fontWeight:700}}>{sv.id==="nation"?NATION_FLAGS[p.nation]||p.nation:sv.id==="foot"?(p.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(p[sv.id])}`}</span>)}</div>}
             </div>
-          );
-        })}
+            <button onClick={()=>setCap(p.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:cap===p.id?"#ffd700":T.faint,padding:2,flexShrink:0}}>★</button>
+            <div style={{fontSize:10,fontWeight:800,color:rc(p.rating),flexShrink:0}}>{p.rating}</div>
+          </div>
+        );})}
       </div>
     </div>
   );
 }
 
-// ─── SQUAD STATS ─────────────────────────────────────────────────────────────
-function SquadStats({ lineup }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  const filled=lineup.filter(Boolean);
-  if(!filled.length)return null;
-  const avg=k=>{const v=filled.map(p=>p[k]).filter(x=>x!==undefined);return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
-  const sum=k=>filled.reduce((a,p)=>a+(p[k]||0),0);
+function SquadStats({lineup}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  const f=lineup.filter(Boolean);if(!f.length)return null;
+  const avg=k=>{const v=f.map(p=>p[k]).filter(x=>x!==undefined);return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
+  const sum=k=>f.reduce((a,p)=>a+(p[k]||0),0);
   const ag={"≤21":0,"22-25":0,"26-29":0,"30+":0};
-  filled.forEach(p=>{if(p.age<=21)ag["≤21"]++;else if(p.age<=25)ag["22-25"]++;else if(p.age<=29)ag["26-29"]++;else ag["30+"]++;});
-  const exp=filled.filter(p=>p.contract<=2026).length;
-  const lf=filled.filter(p=>p.foot==="L").length;
+  f.forEach(p=>{if(p.age<=21)ag["≤21"]++;else if(p.age<=25)ag["22-25"]++;else if(p.age<=29)ag["26-29"]++;else ag["30+"]++;});
   return(
-    <div style={{ background:T.panel, borderRadius:12, border:`1px solid ${T.panelBorder}`, overflow:"hidden" }}>
-      <div style={{ padding:"9px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-        <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, letterSpacing:"1px", textTransform:"uppercase" }}>Statistiche rosa</div>
+    <div style={{background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden"}}>
+      <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:T.dim,letterSpacing:"1px",textTransform:"uppercase"}}>Statistiche</div>
       </div>
-      <div style={{ padding:"2px 0" }}>
-        {[
-          {label:"Rating medio",value:avg("rating").toFixed(1),color:ratingColor(avg("rating"))},
-          {label:"Età media",value:`${avg("age").toFixed(1)} anni`},
-          {label:"Valore totale",value:`€${sum("value")}M`,color:"#16a34a"},
-          {label:"Stipendi/anno",value:`€${sum("wage").toLocaleString("it-IT")}K`,color:"#f59e0b"},
-          {label:"Altezza media",value:`${avg("height").toFixed(0)} cm`},
-          {label:"Mancini",value:`${lf}/${filled.length}`,color:"#ec4899"},
-          {label:"In scadenza ⚠",value:`${exp}`,color:exp>0?"#ef4444":T.textMuted},
-        ].map(s=>(
-          <div key={s.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 12px", borderBottom:`1px solid ${T.panelBorder}` }}>
-            <span style={{ fontSize:10, color:T.textMuted }}>{s.label}</span>
-            <span style={{ fontSize:11, fontWeight:700, color:s.color||T.text }}>{s.value}</span>
+      <div style={{padding:"2px 0"}}>
+        {[{l:"Rating medio",v:avg("rating").toFixed(1),c:rc(avg("rating"))},{l:"Età media",v:`${avg("age").toFixed(1)}a`},
+          {l:"Valore totale",v:`€${sum("value")}M`,c:"#16a34a"},{l:"Stipendi/anno",v:`€${sum("wage").toLocaleString("it-IT")}K`,c:"#f59e0b"},
+          {l:"Mancini",v:`${f.filter(p=>p.foot==="L").length}/${f.length}`,c:"#ec4899"},
+          {l:"In scadenza ⚠",v:`${f.filter(p=>p.contract<=2026).length}`,c:f.some(p=>p.contract<=2026)?"#ef4444":T.dim},
+        ].map(s=><div key={s.l} style={{display:"flex",justifyContent:"space-between",padding:"4px 12px",borderBottom:`1px solid ${T.border}`}}>
+          <span style={{fontSize:10,color:T.dim}}>{s.l}</span><span style={{fontSize:11,fontWeight:700,color:s.c||T.text}}>{s.v}</span>
+        </div>)}
+      </div>
+      <div style={{padding:"7px 12px 10px",borderTop:`1px solid ${T.border}`}}>
+        <div style={{fontSize:9,fontWeight:700,color:T.dim,textTransform:"uppercase",marginBottom:5}}>Distribuzione età</div>
+        {Object.entries(ag).map(([l,c])=><div key={l} style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+          <span style={{fontSize:9,color:T.dim,width:34}}>{l}</span>
+          <div style={{flex:1,height:4,background:T.inpBg,borderRadius:2,overflow:"hidden"}}>
+            <div style={{width:`${f.length?(c/f.length)*100:0}%`,height:"100%",background:l==="≤21"?"#3b82f6":l==="22-25"?"#16a34a":l==="26-29"?"#f59e0b":"#ef4444",borderRadius:2}}/>
           </div>
-        ))}
+          <span style={{fontSize:9,color:T.dim,width:10,textAlign:"right"}}>{c}</span>
+        </div>)}
       </div>
-      <div style={{ padding:"7px 12px 10px", borderTop:`1px solid ${T.panelBorder}` }}>
-        <div style={{ fontSize:9, fontWeight:700, color:T.textMuted, textTransform:"uppercase", marginBottom:5 }}>Distribuzione età</div>
-        {Object.entries(ag).map(([l,c])=>(
-          <div key={l} style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
-            <span style={{ fontSize:9, color:T.textMuted, width:34, flexShrink:0 }}>{l}</span>
-            <div style={{ flex:1, height:4, background:T.inputBg, borderRadius:2, overflow:"hidden" }}>
-              <div style={{ width:`${filled.length?(c/filled.length)*100:0}%`, height:"100%", background:l==="≤21"?"#3b82f6":l==="22-25"?"#16a34a":l==="26-29"?"#f59e0b":"#ef4444", borderRadius:2 }}/>
+    </div>
+  );
+}
+
+function AltPicker({player,lineup,positions,onSelect,onClose}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:T.panel,borderRadius:14,width:"100%",maxWidth:340,border:`1px solid ${T.border}`}}>
+        <div style={{padding:"11px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:T.text}}>Alternativa per?</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:18}}>✕</button>
+        </div>
+        <div style={{maxHeight:340,overflowY:"auto"}}>
+          {positions.map(pos=>{const s=lineup[pos.slot];if(!s)return null;return(
+            <div key={pos.slot} onClick={()=>onSelect(pos.slot)} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 14px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e=>e.currentTarget.style.background=T.inpBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div style={{width:24,fontSize:8,fontWeight:700,color:POSITION_COLORS[pos.role],background:POSITION_COLORS[pos.role]+"22",borderRadius:3,textAlign:"center",padding:"2px 3px"}}>{pos.role}</div>
+              <KitSVG club={s.club} size={24}/>
+              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:T.text}}>{s.name}</div><div style={{fontSize:10,color:T.dim}}>→ {player.name}</div></div>
             </div>
-            <span style={{ fontSize:9, color:T.textMuted, width:10, textAlign:"right" }}>{c}</span>
-          </div>
-        ))}
+          );})}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── ALT SLOT PICKER ─────────────────────────────────────────────────────────
-function AltSlotPicker({ player, lineup, positions, onSelect, onClose }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
+function ConfirmModal({team,onOk,onNo}) {
+  const th=useContext(ThemeCtx);const T=THEMES[th];
   return(
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:T.panel, borderRadius:14, width:"100%", maxWidth:340, border:`1px solid ${T.panelBorder}` }}>
-        <div style={{ padding:"11px 14px", borderBottom:`1px solid ${T.panelBorder}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:700, color:T.text }}>Alternativa per quale slot?</div>
-          <button onClick={onClose} style={{ background:"none", border:"none", color:T.textMuted, cursor:"pointer", fontSize:18 }}>✕</button>
-        </div>
-        <div style={{ padding:"5px 0", maxHeight:340, overflowY:"auto" }}>
-          {positions.map(pos=>{
-            const starter=lineup[pos.slot]; if(!starter)return null;
-            const rc=POSITION_COLORS[pos.role]||"#6b7280";
-            return(
-              <div key={pos.slot} onClick={()=>onSelect(pos.slot)}
-                style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 14px", cursor:"pointer", borderBottom:`1px solid ${T.panelBorder}` }}
-                onMouseEnter={e=>e.currentTarget.style.background=T.inputBg}
-                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <div style={{ width:24, fontSize:8, fontWeight:700, color:rc, background:rc+"22", borderRadius:3, textAlign:"center", padding:"2px 3px" }}>{pos.role}</div>
-                <KitSVG club={starter.club} size={24}/>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:T.text }}>{starter.name}</div>
-                  <div style={{ fontSize:10, color:T.textMuted }}>→ {player.name}</div>
-                </div>
-              </div>
-            );
-          })}
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:T.panel,borderRadius:14,width:"100%",maxWidth:360,border:`1px solid ${T.border}`,padding:24,textAlign:"center"}}>
+        <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.text,marginBottom:8}}>Sovrascrivere?</div>
+        <div style={{fontSize:13,color:T.dim,marginBottom:20,lineHeight:1.5}}>Hai giocatori in campo. Caricare <strong style={{color:T.text}}>{team.name}</strong> sostituirà tutti i titolari.</div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onNo} style={{flex:1,padding:10,borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,cursor:"pointer",fontSize:13,fontWeight:600}}>Annulla</button>
+          <button onClick={onOk} style={{flex:1,padding:10,borderRadius:8,border:"none",background:"#16a34a",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700}}>Carica</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── TOAST ───────────────────────────────────────────────────────────────────
-function Toast({ message, onDone }) {
+function Toast({msg,onDone}) {
   useEffect(()=>{const t=setTimeout(onDone,2500);return()=>clearTimeout(t);},[onDone]);
-  return <div style={{ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:"#16a34a", color:"#fff", padding:"10px 20px", borderRadius:10, fontWeight:700, fontSize:14, zIndex:999, boxShadow:"0 8px 24px rgba(0,0,0,0.4)", whiteSpace:"nowrap" }}>{message}</div>;
+  return <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#16a34a",color:"#fff",padding:"10px 20px",borderRadius:10,fontWeight:700,fontSize:14,zIndex:999,whiteSpace:"nowrap"}}>{msg}</div>;
 }
 
-
-// ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
-function ConfirmModal({ teamData, onConfirm, onCancel }) {
-  const th = useTheme(); const T = th==="dark"?DARK:LIGHT;
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <div style={{ background:T.panel, borderRadius:14, width:"100%", maxWidth:360, border:`1px solid ${T.panelBorder}`, padding:24, textAlign:"center" }}>
-        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
-        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:700, color:T.text, marginBottom:8 }}>
-          Sovrascrivere la formazione?
-        </div>
-        <div style={{ fontSize:13, color:T.textMuted, marginBottom:20, lineHeight:1.5 }}>
-          Hai già giocatori in campo. Caricare <strong style={{ color:T.text }}>{teamData.name}</strong> sostituirà tutti i titolari attuali.
-        </div>
-        <div style={{ display:"flex", gap:10 }}>
-          <button onClick={onCancel} style={{ flex:1, padding:"10px", borderRadius:8, border:`1px solid ${T.panelBorder}`, background:"transparent", color:T.textMuted, cursor:"pointer", fontSize:13, fontWeight:600 }}>Annulla</button>
-          <button onClick={onConfirm} style={{ flex:1, padding:"10px", borderRadius:8, border:"none", background:"#16a34a", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700 }}>Carica {teamData.name}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── XL ROLE MAP ─────────────────────────────────────────────────────────────
-const XLR = {'GK':'GK','ST':'ST','LS':'ST','RS':'ST','CF':'ST','LCB':'CB','RCB':'CB','CB':'CB','MCB':'CB','LB':'LB','LWB':'LB','RB':'RB','RWB':'RB','CDM':'DM','LCDM':'DM','RCDM':'DM','LCM':'CM','RCM':'CM','CM':'CM','CAM':'AM','LAM':'LW','RAM':'RW','LM':'LM','RM':'RM','LW':'LW','RW':'RW'};
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP
+   ═══════════════════════════════════════════════════════════════════════════ */
 export default function App() {
   const [theme, setTheme] = useState("dark");
-  const T = theme === "dark" ? DARK : LIGHT;
+  const T = THEMES[theme];
 
-  const [mode, setMode] = useState("single");
-  const [activeTeam, setActiveTeam] = useState(0);
+  // ── State: plain useState, no fancy hooks ────────────────────────────────
+  const [lineup, setLineup]     = useState(Array(11).fill(null));
+  const [form,   setFormRaw]    = useState("4-3-3");
+  const [name,   setName]       = useState("La mia Squadra");
+  const [color,  setColor]      = useState("#16a34a");
+  const [alts,   setAlts]       = useState({});
+  const [bench,  setBench]      = useState([]);
+  const [cap,    setCap]        = useState(null);
 
-  const [lineup1, setLineup1, undo1, redo1, canUndo1, canRedo1] = useUndoable(Array(11).fill(null));
-  const [lineup2, setLineup2, undo2, redo2, canUndo2, canRedo2] = useUndoable(Array(11).fill(null));
-  const [formation1, setFormation1Raw] = useState("4-3-3");
-  const [formation2, setFormation2Raw] = useState("4-3-3");
-  const [teamName1, setTeamName1] = useState("Squadra A");
-  const [teamName2, setTeamName2] = useState("Squadra B");
-  const [teamColor1, setTeamColor1] = useState("#16a34a");
-  const [teamColor2, setTeamColor2] = useState("#2563eb");
-  const [altPlayers1, setAltPlayers1] = useState({});
-  const [altPlayers2, setAltPlayers2] = useState({});
-  const [bench1, setBench1] = useState([]);
-  const [bench2, setBench2] = useState([]);
-  const [captain1, setCaptain1] = useState(null);
-  const [captain2, setCaptain2] = useState(null);
+  const [stats,  setStats]      = useState(["rating"]);
+  const [kits,   setKits]       = useState(false);
+  const [picking,setPicking]    = useState(null);   // {slot, role}
+  const [teamPicker,setTeamPicker] = useState(false);
+  const [altPick,setAltPick]    = useState(null);   // player object
+  const [pending,setPending]    = useState(null);    // team to confirm
+  const [toast,  setToast]      = useState(null);
+  const [saved,  setSaved]      = useState([]);
+  const [showSaved,setShowSaved]= useState(false);
 
-  const [activeStats, setActiveStats] = useState(["rating"]);
-  const [showKits, setShowKits] = useState(false);
-  const [selectingSlot, setSelectingSlot] = useState(null);
-  const [selectedSlotRole, setSelectedSlotRole] = useState(null);
-  const [showTeamPicker, setShowTeamPicker] = useState(false);
-  const [altPickerPlayer, setAltPickerPlayer] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [savedLineups, setSavedLineups] = useState([]);
-  const [showSaved, setShowSaved] = useState(false);
+  useEffect(()=>{setSaved(JSON.parse(localStorage.getItem(SAVE_KEY)||"[]"));},[]);
 
-  // Current team aliases
-  const lineup      = activeTeam===0?lineup1:lineup2;
-  const setLineup   = activeTeam===0?setLineup1:setLineup2;
-  const formation   = activeTeam===0?formation1:formation2;
-  const teamName    = activeTeam===0?teamName1:teamName2;
-  const teamColor   = activeTeam===0?teamColor1:teamColor2;
-  const altPlayers  = activeTeam===0?altPlayers1:altPlayers2;
-  const bench       = activeTeam===0?bench1:bench2;
-  const captain     = activeTeam===0?captain1:captain2;
-  const setTeamName  = activeTeam===0?setTeamName1:setTeamName2;
-  const setTeamColor = activeTeam===0?setTeamColor1:setTeamColor2;
-  const setAltPlayers = activeTeam===0?setAltPlayers1:setAltPlayers2;
-  const setBench     = activeTeam===0?setBench1:setBench2;
-  const setCaptain   = activeTeam===0?setCaptain1:setCaptain2;
-  const undoLineup   = activeTeam===0?undo1:undo2;
-  const redoLineup   = activeTeam===0?redo1:redo2;
-  const canUndo      = activeTeam===0?canUndo1:canUndo2;
-  const canRedo      = activeTeam===0?canRedo1:canRedo2;
+  // ── Formation change — simple: just set formation, DON'T remap ──────────
+  // Players stay in their slots. No crash possible.
+  const setForm = useCallback(f => setFormRaw(f), []);
 
-  // Formation change with remap
-  const setFormation = useCallback((f) => {
-    if (activeTeam === 0) {
-      setFormation1Raw(f);
-      setLineup1(prev => remapToFormation(f, prev));
-    } else {
-      setFormation2Raw(f);
-      setLineup2(prev => remapToFormation(f, prev));
-    }
-  }, [activeTeam]);
+  // ── Load team ───────────────────────────────────────────────────────────
+  const doLoad = useCallback(team => {
+    const tf = team.formation || "4-3-3";
+    const positions = FORMATIONS[tf]?.positions || [];
+    const newLU = Array(11).fill(null);
+    const used = new Set();
+    const starters = (team.starters||[])
+      .map(s=>({...s,p:s.playerId?PLAYERS.find(x=>x.id===s.playerId):null}))
+      .filter(s=>s.p);
+    // Pass 1: exact role match from starters
+    positions.forEach(pos=>{
+      if(newLU[pos.slot])return;
+      const c=starters.find(s=>XLR[s.xlRole]===pos.role&&!used.has(s.p.id))
+           ||starters.find(s=>s.p.position===pos.role&&!used.has(s.p.id));
+      if(c){newLU[pos.slot]=c.p;used.add(c.p.id);}
+    });
+    // Pass 2: fill from team roster
+    const roster=PLAYERS.filter(p=>p.club===team.name).sort((a,b)=>b.rating-a.rating);
+    positions.forEach(pos=>{if(newLU[pos.slot])return;const c=roster.find(p=>p.position===pos.role&&!used.has(p.id));if(c){newLU[pos.slot]=c;used.add(c.id);}});
+    positions.forEach(pos=>{if(newLU[pos.slot])return;const c=roster.find(p=>!used.has(p.id));if(c){newLU[pos.slot]=c;used.add(c.id);}});
 
-  useEffect(()=>{
-    const hash=window.location.hash.slice(1);
-    if(hash){const d=dec(hash);if(d){const pl=d.l.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null);setLineup1(pl);if(d.f)setFormation1Raw(d.f);if(d.n)setTeamName1(d.n);if(d.c)setTeamColor1(d.c);if(d.a)setAltPlayers1(d.a);}}
-    setSavedLineups(JSON.parse(localStorage.getItem(SAVED_KEY)||"[]"));
+    setLineup(newLU);
+    setFormRaw(tf);
+    setName(team.name);
+    setColor(team.color);
+    setAlts({});
+    setBench(PLAYERS.filter(p=>p.club===team.name));
+    setTeamPicker(false);
+    setPending(null);
+    setToast(`${team.name} caricata! ⚽`);
   },[]);
 
-  const [pendingTeam, setPendingTeam] = useState(null);
-
-  const doLoadTeam = useCallback(teamData => {
-    const tf = teamData.formation || "4-3-3";
-    const positions = FORMATIONS[tf]?.positions || [];
-    const newLineup = Array(11).fill(null);
-    const usedIds = new Set();
-    const starters = (teamData.starters||[])
-      .map(s => ({ ...s, player: s.playerId ? PLAYERS.find(p=>p.id===s.playerId)||null : null }))
-      .filter(s => s.player);
-
-    positions.forEach(pos => {
-      if (newLineup[pos.slot]) return;
-      const c = starters.find(s => XLR[s.xlRole]===pos.role && !usedIds.has(s.player.id))
-             || starters.find(s => s.player.position===pos.role && !usedIds.has(s.player.id));
-      if (c) { newLineup[pos.slot]=c.player; usedIds.add(c.player.id); }
-    });
-    const tp = PLAYERS.filter(p=>p.club===teamData.name).sort((a,b)=>b.rating-a.rating);
-    positions.forEach(pos => {
-      if (newLineup[pos.slot]) return;
-      const c = tp.find(p=>p.position===pos.role&&!usedIds.has(p.id));
-      if (c) { newLineup[pos.slot]=c; usedIds.add(c.id); }
-    });
-    positions.forEach(pos => {
-      if (newLineup[pos.slot]) return;
-      const c = tp.find(p=>!usedIds.has(p.id));
-      if (c) { newLineup[pos.slot]=c; usedIds.add(c.id); }
-    });
-
-    if (activeTeam === 0) {
-      setLineup1(newLineup); setFormation1Raw(tf);
-      setTeamName1(teamData.name); setTeamColor1(teamData.color);
-      setAltPlayers1({}); setBench1(PLAYERS.filter(p=>p.club===teamData.name));
-    } else {
-      setLineup2(newLineup); setFormation2Raw(tf);
-      setTeamName2(teamData.name); setTeamColor2(teamData.color);
-      setAltPlayers2({}); setBench2(PLAYERS.filter(p=>p.club===teamData.name));
-    }
-    setShowTeamPicker(false);
-    setToast(`${teamData.name} caricata! ⚽`);
-    setPendingTeam(null);
-  }, [activeTeam]);
-
-  const loadTeam = useCallback(teamData => {
-    const currentLineup = activeTeam === 0 ? lineup1 : lineup2;
-    const hasPlayers = currentLineup.some(Boolean);
-    if (hasPlayers) {
-      setPendingTeam(teamData);
-      setShowTeamPicker(false);
-    } else {
-      doLoadTeam(teamData);
-    }
-  }, [activeTeam, lineup1, lineup2, doLoadTeam]);
-
-  const handleAutoFill = () => {
-    const pool = bench.length > 0 ? bench : PLAYERS;
-    setLineup(prev => autoFill(formation, prev, pool));
-    setToast("Auto-fill completato! 🤖");
+  const loadTeam = team => {
+    if (lineup.some(Boolean)) { setPending(team); setTeamPicker(false); }
+    else doLoad(team);
   };
 
-  const openSlot = (slot, isAlt=false) => {
-    const pd = (FORMATIONS[formation]?.positions||[]).find(p=>p.slot===slot);
-    setSelectedSlotRole(pd?.role||null);
-    setSelectingSlot({slot, isAlt});
+  // ── Slot click → open search ────────────────────────────────────────────
+  const slotClick = slot => {
+    const pos=(FORMATIONS[form]?.positions||[]).find(p=>p.slot===slot);
+    setPicking({slot,role:pos?.role||null});
   };
 
-  const handlePlayerSelect = player => {
-    if (!selectingSlot) return;
-    const {slot, isAlt} = selectingSlot;
-    if (isAlt) setAltPlayers(prev=>({...prev,[slot]:player.id}));
-    else setLineup(prev=>{const n=[...prev];n[slot]=player;return n;});
-    setSelectingSlot(null);
+  const selectPlayer = player => {
+    if(!picking)return;
+    setLineup(prev=>{const n=[...prev];n[picking.slot]=player;return n;});
+    setPicking(null);
   };
 
-  const handleSlotDrop = useCallback((slot, {player, fromSlot}, teamIdx) => {
-    const setter = teamIdx===0 ? setLineup1 : setLineup2;
-    setter(prev => {
+  // ── Drag & drop (HTML5 only, works on PC) ───────────────────────────────
+  const handleDrop = useCallback((targetSlot, data) => {
+    setLineup(prev => {
       const next = [...prev];
-      if (fromSlot !== undefined && fromSlot !== null) {
-        [next[fromSlot], next[slot]] = [next[slot], next[fromSlot]];
+      if (data.slot !== undefined && data.slot !== null) {
+        // Swap: drag from slot to slot
+        const fromPlayer = PLAYERS.find(p=>p.id===data.id);
+        [next[data.slot], next[targetSlot]] = [next[targetSlot], next[data.slot]];
       } else {
-        next[slot] = player;
+        // From search/bench: just place
+        const p = PLAYERS.find(x=>x.id===data.id);
+        if (p) next[targetSlot] = p;
       }
       return next;
     });
   }, []);
 
-  const handleBenchClick = player => setAltPickerPlayer(player);
-  const handleAltSlotSelect = slot => {
-    if (!altPickerPlayer) return;
-    setAltPlayers(prev=>({...prev,[slot]:altPickerPlayer.id}));
-    setAltPickerPlayer(null);
-    setToast(`${altPickerPlayer.shortName} → alternativa ↕`);
+  const removePlayer = slot => setLineup(prev=>{const n=[...prev];n[slot]=null;return n;});
+  const removeAlt = slot => setAlts(prev=>{const n={...prev};delete n[slot];return n;});
+  const benchClick = player => setAltPick(player);
+  const altSlotSelect = slot => {
+    if(!altPick)return;
+    setAlts(prev=>({...prev,[slot]:altPick.id}));
+    setAltPick(null);
+    setToast(`${altPick.shortName} → alternativa ↕`);
   };
 
-  const handleRemovePlayer = slot => setLineup(prev=>{const n=[...prev];n[slot]=null;return n;});
-  const handleRemoveAlt = slot => setAltPlayers(prev=>{const n={...prev};delete n[slot];return n;});
-
-  const handleShare = () => {
-    const code = enc(lineup1,formation1,teamName1,teamColor1,altPlayers1);
-    const url = `${window.location.origin}${window.location.pathname}#${code}`;
+  const share = () => {
+    const code=enc(lineup,form,name,color,alts);
+    const url=`${location.origin}${location.pathname}#${code}`;
     navigator.clipboard.writeText(url).then(()=>setToast("Link copiato! 🔗")).catch(()=>{});
   };
-
-  const handleSave = () => {
-    const saved=JSON.parse(localStorage.getItem(SAVED_KEY)||"[]");
-    const entry={id:Date.now(),name:teamName1,formation:formation1,color:teamColor1,lineup:lineup1.map(p=>p?.id??null),altPlayers:altPlayers1,date:new Date().toLocaleDateString("it-IT")};
-    const updated=[entry,...saved].slice(0,10);
-    localStorage.setItem(SAVED_KEY,JSON.stringify(updated));
-    setSavedLineups(updated);
-    setToast("Salvata! 💾");
+  const save = () => {
+    const s=JSON.parse(localStorage.getItem(SAVE_KEY)||"[]");
+    const e={id:Date.now(),name,formation:form,color,lineup:lineup.map(p=>p?.id??null),alts,date:new Date().toLocaleDateString("it-IT")};
+    const u=[e,...s].slice(0,10);
+    localStorage.setItem(SAVE_KEY,JSON.stringify(u));setSaved(u);setToast("Salvata! 💾");
+  };
+  const load = entry => {
+    setLineup(entry.lineup.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null));
+    setFormRaw(entry.formation);setName(entry.name);setColor(entry.color);
+    setAlts(entry.alts||{});setShowSaved(false);setToast("Caricata! ✅");
   };
 
-  const handleLoadSaved = entry => {
-    const pl=entry.lineup.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null);
-    setLineup1(pl);setFormation1Raw(entry.formation);setTeamName1(entry.name);
-    setTeamColor1(entry.color);setAltPlayers1(entry.altPlayers||{});
-    setShowSaved(false);setToast("Caricata! ✅");
-  };
-
-  const positions = FORMATIONS[formation]?.positions||[];
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
-  useEffect(()=>{const h=()=>setIsMobile(window.innerWidth<900);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-
-  const gridCols = mode==="compare"
-    ? (isMobile?"1fr":"200px 1fr 1fr 200px")
-    : (isMobile?"1fr":"200px 1fr 200px 180px");
+  const positions = FORMATIONS[form]?.positions||[];
+  const [mobile,setMobile]=useState(window.innerWidth<900);
+  useEffect(()=>{const h=()=>setMobile(window.innerWidth<900);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
 
   return (
     <ThemeCtx.Provider value={theme}>
-      <div style={{ minHeight:"100vh", background:T.bg, color:T.text, fontFamily:"'Inter',sans-serif" }}>
-        <style>{`
-          *{box-sizing:border-box;}
-          html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}
-          ::-webkit-scrollbar{width:4px;}
-          ::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}
-          input[type=range]{accent-color:#ffd700;}
-        `}</style>
+      <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif"}}>
+        <style>{`*{box-sizing:border-box;}html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}input[type=range]{accent-color:#ffd700;}`}</style>
 
         {/* HEADER */}
-        <header style={{ background:T.headerBg, backdropFilter:"blur(12px)", borderBottom:`1px solid ${T.panelBorder}`, padding:"0 14px", height:50, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:26, height:26, background:"linear-gradient(135deg,#16a34a,#059669)", borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>⚽</div>
+        <header style={{background:T.head,backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 14px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:26,height:26,background:"linear-gradient(135deg,#16a34a,#059669)",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>⚽</div>
             <div>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:900, lineHeight:1, color:T.text }}>LINEUP BUILDER</div>
-              <div style={{ fontSize:8, color:T.textMuted, letterSpacing:"1.5px" }}>UNIVERSO SPORTIVO</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:900,lineHeight:1,color:T.text}}>LINEUP BUILDER</div>
+              <div style={{fontSize:8,color:T.dim,letterSpacing:"1.5px"}}>UNIVERSO SPORTIVO</div>
             </div>
           </div>
-          <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
-            {/* Mode */}
-            <div style={{ display:"flex", background:T.inputBg, borderRadius:7, border:`1px solid ${T.panelBorder}`, overflow:"hidden" }}>
-              {[{id:"single",label:"Builder"},{id:"compare",label:"⚔️ VS"}].map(m=>(
-                <button key={m.id} onClick={()=>{setMode(m.id);setActiveTeam(0);}} style={{ padding:"5px 10px", border:"none", cursor:"pointer", fontSize:11, fontWeight:700, background:mode===m.id?"#16a34a":"transparent", color:mode===m.id?"#fff":T.textMuted }}>{m.label}</button>
-              ))}
-            </div>
-            {/* Theme */}
-            <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} title="Cambia tema" style={{ background:T.inputBg, border:`1px solid ${T.panelBorder}`, color:T.text, borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:13 }}>{theme==="dark"?"☀️":"🌙"}</button>
-            <button onClick={()=>{undoLineup();}} disabled={!canUndo} style={{ background:T.inputBg, border:`1px solid ${T.panelBorder}`, color:canUndo?T.text:T.textFaint, borderRadius:6, padding:"5px 8px", cursor:canUndo?"pointer":"default", fontSize:12 }}>↩</button>
-            <button onClick={()=>{redoLineup();}} disabled={!canRedo} style={{ background:T.inputBg, border:`1px solid ${T.panelBorder}`, color:canRedo?T.text:T.textFaint, borderRadius:6, padding:"5px 8px", cursor:canRedo?"pointer":"default", fontSize:12 }}>↪</button>
-            <button onClick={handleAutoFill} title="Auto-fill" style={{ background:"rgba(99,102,241,0.15)", border:"1px solid rgba(99,102,241,0.4)", color:"#818cf8", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>🤖</button>
-            <button onClick={()=>setExporting(true)} style={{ background:T.inputBg, border:`1px solid ${T.panelBorder}`, color:T.text, borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>📸</button>
-            <button onClick={handleSave} style={{ background:T.inputBg, border:`1px solid ${T.panelBorder}`, color:T.text, borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:12 }}>💾</button>
-            <button onClick={()=>setShowSaved(s=>!s)} style={{ background:showSaved?"#16a34a18":T.inputBg, border:`1px solid ${showSaved?"#16a34a":T.panelBorder}`, color:showSaved?"#16a34a":T.text, borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:11 }}>📁{savedLineups.length>0&&` (${savedLineups.length})`}</button>
-            <button onClick={handleShare} style={{ background:"#16a34a", border:"none", color:"#fff", borderRadius:6, padding:"5px 10px", cursor:"pointer", fontSize:11, fontWeight:700 }}>🔗</button>
+          <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+            <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} style={{background:T.inpBg,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:13}}>{theme==="dark"?"☀️":"🌙"}</button>
+            <button onClick={save} style={{background:T.inpBg,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>💾</button>
+            <button onClick={()=>setShowSaved(s=>!s)} style={{background:showSaved?"#16a34a18":T.inpBg,border:`1px solid ${showSaved?"#16a34a":T.border}`,color:showSaved?"#16a34a":T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11}}>📁{saved.length>0&&` (${saved.length})`}</button>
+            <button onClick={share} style={{background:"#16a34a",border:"none",color:"#fff",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:700}}>🔗</button>
           </div>
         </header>
 
-        {/* SAVED DRAWER */}
-        {showSaved && (
-          <div style={{ background:T.panel, borderBottom:`1px solid ${T.panelBorder}`, padding:"9px 14px" }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, marginBottom:7, color:T.text }}>Formazzioni salvate</div>
-            {savedLineups.length===0
-              ? <div style={{ color:T.textMuted, fontSize:11 }}>Nessuna</div>
-              : <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
-                  {savedLineups.map(e=>(
-                    <div key={e.id} onClick={()=>handleLoadSaved(e)} style={{ background:T.inputBg, border:`1px solid ${e.color}44`, borderRadius:8, padding:"6px 10px", cursor:"pointer", display:"flex", alignItems:"center", gap:7 }}>
-                      <div style={{ width:8, height:8, borderRadius:"50%", background:e.color }}/>
-                      <div><div style={{ fontSize:11, fontWeight:700, color:T.text }}>{e.name}</div><div style={{ fontSize:9, color:T.textMuted }}>{e.formation} · {e.date}</div></div>
-                    </div>
-                  ))}
-                </div>
-            }
-          </div>
-        )}
+        {showSaved&&<div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,padding:"9px 14px"}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,marginBottom:7,color:T.text}}>Salvate</div>
+          {saved.length===0?<div style={{color:T.dim,fontSize:11}}>Nessuna</div>
+          :<div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{saved.map(e=>(
+            <div key={e.id} onClick={()=>load(e)} style={{background:T.inpBg,border:`1px solid ${e.color}44`,borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:7}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
+              <div><div style={{fontSize:11,fontWeight:700,color:T.text}}>{e.name}</div><div style={{fontSize:9,color:T.dim}}>{e.formation} · {e.date}</div></div>
+            </div>
+          ))}</div>}
+        </div>}
 
-        {/* MAIN */}
-        <main style={{ maxWidth:mode==="compare"?1320:1160, margin:"0 auto", padding:"12px 10px", display:"grid", gridTemplateColumns:gridCols, gap:12, alignItems:"start" }}>
-
-          {/* COL 1: Settings */}
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {mode==="compare" && (
-              <div style={{ display:"flex", gap:5 }}>
-                {[{i:0,n:teamName1,c:teamColor1},{i:1,n:teamName2,c:teamColor2}].map(t=>(
-                  <button key={t.i} onClick={()=>setActiveTeam(t.i)} style={{ flex:1, padding:"5px 8px", borderRadius:7, border:`2px solid ${t.c}`, background:activeTeam===t.i?t.c+"22":"transparent", color:activeTeam===t.i?t.c:T.textMuted, cursor:"pointer", fontWeight:700, fontSize:10 }}>{t.n||`Sqd ${t.i+1}`}</button>
-                ))}
-              </div>
-            )}
-            <TeamSettings teamName={teamName} setTeamName={setTeamName} teamColor={teamColor} setTeamColor={setTeamColor} formation={formation} setFormation={setFormation} onOpenTeamPicker={()=>setShowTeamPicker(true)} showKits={showKits} setShowKits={setShowKits}/>
-            <StatSelector activeStats={activeStats} setActiveStats={setActiveStats}/>
-            <div style={{ background:T.panel, borderRadius:10, border:`1px solid ${T.panelBorder}`, padding:"8px 12px" }}>
-              <button onClick={()=>{setLineup(Array(11).fill(null));setAltPlayers({});setBench([]);}} style={{ width:"100%", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.25)", color:"#f87171", borderRadius:6, padding:"6px", cursor:"pointer", fontSize:11, fontWeight:600 }}>🗑 Svuota</button>
+        <main style={{maxWidth:1160,margin:"0 auto",padding:"12px 10px",display:"grid",gridTemplateColumns:mobile?"1fr":"200px 1fr 200px 180px",gap:12,alignItems:"start"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)}/>
+            <StatSel stats={stats} setStats={setStats}/>
+            <div style={{background:T.panel,borderRadius:10,border:`1px solid ${T.border}`,padding:"8px 12px"}}>
+              <button onClick={()=>{setLineup(Array(11).fill(null));setAlts({});setBench([]);}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button>
             </div>
           </div>
 
-          {/* COL 2: Pitch 1 */}
-          <div>
-            {mode==="compare" && <CompareHeader team1={{name:teamName1,color:teamColor1}} team2={{name:teamName2,color:teamColor2}} lineup1={lineup1} lineup2={lineup2}/>}
-            <Pitch lineup={lineup1} altPlayers={altPlayers1} formation={formation1}
-              onSlotDrop={(slot,data)=>handleSlotDrop(slot,data,0)}
-              onSlotClick={slot=>{setActiveTeam(0);openSlot(slot);}}
-              teamName={teamName1} teamColor={teamColor1} activeStats={activeStats} showKits={showKits} captain={captain1}/>
+          <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick}
+            name={name} color={color} stats={stats} kits={kits} cap={cap}/>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt}
+              onSlot={slotClick} stats={stats} cap={cap} setCap={setCap}/>
+            <BenchPanel bench={bench} lineup={lineup} alts={alts} onSetAlt={benchClick} stats={stats} cap={cap} setCap={setCap}/>
           </div>
 
-          {/* COL 3 */}
-          {mode==="compare" ? (
-            <Pitch lineup={lineup2} altPlayers={altPlayers2} formation={formation2}
-              onSlotDrop={(slot,data)=>handleSlotDrop(slot,data,1)}
-              onSlotClick={slot=>{setActiveTeam(1);openSlot(slot);}}
-              teamName={teamName2} teamColor={teamColor2} activeStats={activeStats} showKits={showKits} captain={captain2}/>
-          ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              <LineupPanel lineup={lineup} altPlayers={altPlayers} formation={formation} onRemovePlayer={handleRemovePlayer} onRemoveAlt={handleRemoveAlt} onClickSlot={slot=>openSlot(slot)} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
-              <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
-            </div>
-          )}
-
-          {/* COL 4: Stats */}
-          {!isMobile && (
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              <SquadStats lineup={lineup}/>
-              {mode==="compare" && (
-                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  <LineupPanel lineup={lineup} altPlayers={altPlayers} formation={formation} onRemovePlayer={handleRemovePlayer} onRemoveAlt={handleRemoveAlt} onClickSlot={slot=>openSlot(slot)} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
-                  <BenchPanel benchPlayers={bench} lineup={lineup} altPlayers={altPlayers} onSetAlt={handleBenchClick} activeStats={activeStats} captain={captain} onSetCaptain={setCaptain}/>
-                </div>
-              )}
-            </div>
-          )}
+          {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <SquadStats lineup={lineup}/>
+          </div>}
         </main>
 
-        {/* MODALS */}
-        {showTeamPicker && <TeamPicker onSelect={loadTeam} onClose={()=>setShowTeamPicker(false)}/>}
-        {selectingSlot !== null && <PlayerSearch onSelectPlayer={handlePlayerSelect} onClose={()=>setSelectingSlot(null)} selectedSlotRole={selectedSlotRole} currentLineup={lineup} isAlt={selectingSlot.isAlt} slotPlayer={lineup[selectingSlot.slot]}/>}
-        {altPickerPlayer && <AltSlotPicker player={altPickerPlayer} lineup={lineup} positions={positions} onSelect={handleAltSlotSelect} onClose={()=>setAltPickerPlayer(null)}/>}
-        {exporting && <ExportCanvas lineup={lineup} formation={formation} teamName={teamName} teamColor={teamColor} activeStats={activeStats} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
-        {toast && <Toast message={toast} onDone={()=>setToast(null)}/>}
-        {pendingTeam && <ConfirmModal teamData={pendingTeam} onConfirm={()=>doLoadTeam(pendingTeam)} onCancel={()=>setPendingTeam(null)}/>}
+        {teamPicker&&<TeamPicker onSelect={loadTeam} onClose={()=>setTeamPicker(false)}/>}
+        {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup}/>}
+        {altPick&&<AltPicker player={altPick} lineup={lineup} positions={positions} onSelect={altSlotSelect} onClose={()=>setAltPick(null)}/>}
+        {pending&&<ConfirmModal team={pending} onOk={()=>doLoad(pending)} onNo={()=>setPending(null)}/>}
+        {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
       </div>
     </ThemeCtx.Provider>
   );
