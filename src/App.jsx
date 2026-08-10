@@ -223,8 +223,7 @@ function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
   const th = useContext(ThemeCtx); const T = THEMES[th];
   const [q,setQ]=useState("");const [pf,setPf]=useState("ALL");const [cf,setCf]=useState("ALL");
   const [minR,setMinR]=useState(60);const [minA,setMinA]=useState(16);const [maxA,setMaxA]=useState(40);
-  const [minW,setMinW]=useState(0);const [maxW,setMaxW]=useState(15);
-  const [minV,setMinV]=useState(0);const [maxV,setMaxV]=useState(200);
+  const [minW,setMinW]=useState(0);const [maxW,setMaxW]=useState(15);const [minV,setMinV]=useState(0);const [maxV,setMaxV]=useState(200);
   const [footF,setFootF]=useState("ALL");
   const [conF,setConF]=useState("ALL");const [adv,setAdv]=useState(false);
   const ref=useRef();
@@ -241,9 +240,9 @@ function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
     if(p.age<minA)return false;
     if(maxA<40&&p.age>maxA)return false;
     const wM=p.wage/1000;
-    if(wM<minW)return false;
+    if(minW>0&&wM<minW)return false;
     if(maxW<15&&wM>maxW)return false;
-    if(p.value<minV)return false;
+    if(minV>0&&p.value<minV)return false;
     if(maxV<200&&p.value>maxV)return false;
     if(footF!=="ALL"&&p.foot!==footF)return false;
     if(conF==="exp"&&p.contract>2026)return false;
@@ -279,6 +278,10 @@ function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
             {[{l:"Rating min",v:minR,s:setMinR,mn:60,mx:90,st:1,cl:"#ffd700",f:v=>v},
               {l:"Età min",v:minA,s:setMinA,mn:16,mx:40,st:1,cl:"#3b82f6",f:v=>v<=16?"—":v+"a"},
               {l:"Età max",v:maxA,s:setMaxA,mn:16,mx:40,st:1,cl:"#3b82f6",f:v=>v>=40?"∞":v+"a"},
+              {l:"Stip. min M€/a",v:minW,s:setMinW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v<=0?"—":"€"+v+"M"},
+              {l:"Stip. max M€/a",v:maxW,s:setMaxW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v>=15?"∞":"€"+v+"M"},
+              {l:"Valore min €M",v:minV,s:setMinV,mn:0,mx:200,st:5,cl:"#16a34a",f:v=>v<=0?"—":"€"+v+"M"},
+              {l:"Valore max €M",v:maxV,s:setMaxV,mn:0,mx:200,st:5,cl:"#16a34a",f:v=>v>=200?"∞":"€"+v+"M"},
               {l:"Stip. min M/a",v:minW,s:setMinW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v<=0?"—":"€"+v+"M"},
               {l:"Stip. max M/a",v:maxW,s:setMaxW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v>=15?"∞":"€"+v+"M"},
               {l:"Valore min €M",v:minV,s:setMinV,mn:0,mx:200,st:5,cl:"#16a34a",f:v=>v<=0?"—":"€"+v+"M"},
@@ -307,7 +310,7 @@ function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
               <KitSVG club={p.club} size={26}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:700,color:T.text}}>{p.name} <span style={{fontSize:11}}>{NATION_FLAGS[p.nation]||""}</span>{p.foot==="L"&&<span style={{fontSize:9,color:"#ec4899",marginLeft:4}}>✦</span>}</div>
-                <div style={{fontSize:10,color:T.dim}}>{p.club} · {p.age}a · €{p.value}M{exp&&<span style={{color:"#ef4444",marginLeft:5}}>⚠{p.contract}</span>}</div>
+                <div style={{fontSize:10,color:T.dim}}>{p.club} · {p.age}a · €{p.value}M · €{(p.wage/1000).toFixed(1)}M/a{exp&&<span style={{color:"#ef4444",marginLeft:5}}>⚠{p.contract}</span>}</div>
               </div>
               <div style={{fontSize:9,color:POSITION_COLORS[p.position]||"#6b7280",background:(POSITION_COLORS[p.position]||"#6b7280")+"22",padding:"1px 5px",borderRadius:3,fontWeight:700}}>{p.position}</div>
               <div style={{fontSize:13,fontWeight:800,color:rc(p.rating),width:24,textAlign:"right"}}>{p.rating}</div>
@@ -322,7 +325,7 @@ function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS, LINEUP LIST, BENCH, STATS, COMPARE — pannelli laterali
    ═══════════════════════════════════════════════════════════════════════════ */
-function Settings({name,setName,color,setColor,form,setForm,kits,setKits,onPick}) {
+function Settings({name,setName,color,setColor,form,setForm,kits,setKits,onPick,alt,setAlt}) {
   const th=useContext(ThemeCtx);const T=THEMES[th];
   const colors=["#16a34a","#2563eb","#dc2626","#d97706","#7c3aed","#db2777","#0891b2","#e5e7eb","#000","#8B2500"];
   const cats=[...new Set(Object.values(FORMATIONS).map(f=>f.category))];
@@ -354,6 +357,9 @@ function Settings({name,setName,color,setColor,form,setForm,kits,setKits,onPick}
       <div style={{padding:"8px 12px"}}>
         <button onClick={()=>setKits(s=>!s)} style={{width:"100%",padding:"6px",borderRadius:6,border:`1px solid ${kits?"#16a34a":"rgba(128,128,128,0.3)"}`,background:kits?"rgba(22,163,74,0.1)":"transparent",color:kits?"#16a34a":T.dim,fontSize:11,fontWeight:600,cursor:"pointer"}}>
           {kits?"✓ Kit abilitati":"⚽ Mostra kit"}
+        </button>
+        <button onClick={()=>setAlt(!alt)} style={{width:"100%",padding:"6px",borderRadius:6,border:`1px solid ${alt?"#16a34a":"rgba(128,128,128,0.3)"}`,background:alt?"rgba(22,163,74,0.1)":"transparent",color:alt?"#16a34a":T.dim,fontSize:11,fontWeight:600,cursor:"pointer",marginTop:6}}>
+          {alt?"✓ Riserve attive — clicca titolare":"↕ Aggiungi riserve"}
         </button>
       </div>
     </div>
@@ -723,7 +729,7 @@ export default function App() {
 
         <main style={{maxWidth:1160,margin:"0 auto",padding:"12px 10px",display:"grid",gridTemplateColumns:mobile?"1fr":"200px 1fr 200px 180px",gap:12,alignItems:"start"}}>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)}/>
+            <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)} alt={altMode} setAlt={setAltMode}/>
             <StatSel stats={stats} setStats={setStats}/>
             <div style={{background:T.panel,borderRadius:10,border:`1px solid ${T.border}`,padding:"8px 12px"}}>
               <button onClick={()=>{setLineup(Array(11).fill(null));setAlts({});setBench([]);}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button>
