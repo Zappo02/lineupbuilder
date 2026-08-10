@@ -40,59 +40,35 @@ const KITS = {
   Genoa:{p:"#8B0000",s:"#1B4F72",t:"h"},Torino:{p:"#8B2500",s:"#fff",t:"s"},
 };
 
+let _kc = 0;
+
 function KitSVG({club, size=32}) {
   const k = KITS[club] || {p:"#555",s:"#888",t:"s"};
   const th = useContext(ThemeCtx);
   const sk = th==="dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)";
-  // Disegno su canvas 60×72 scalato
-  const W=60, H=72;
-  // Corpo
-  const bd = `M13,10 Q30,2 47,10 L58,23 L48,28 L48,70 L12,70 L12,28 L2,23 Z`;
-  // Maniche
-  const ml = `M13,10 L2,23 L12,28 L17,17 Z`;
-  const mr = `M47,10 L58,23 L48,28 L43,17 Z`;
-
-  // Per le strisce verticali: 4 rect da 15px ciascuno, alternati
-  const stripes = k.t === "sv" ? [0,1,2,3].map(i => (
-    <rect key={i} x={i*15} y={0} width={15} height={H}
-      fill={i%2===0 ? k.p : k.s}/>
-  )) : null;
-
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = ++_kc;
+  const u = `k${idRef.current}`;
+  const body = "M13,10 Q30,2 47,10 L58,23 L48,28 L48,70 L12,70 L12,28 L2,23 Z";
+  const slvL = "M13,10 L2,23 L12,28 L17,17 Z";
+  const slvR = "M47,10 L58,23 L48,28 L43,17 Z";
   return (
-    <svg width={size} height={Math.round(size*1.2)} viewBox={`0 0 ${W} ${H}`}
-      style={{display:"block",flexShrink:0}}>
-      {/* Sfondo maglia = forma base */}
-      <path d={bd} fill={k.p}/>
-
-      {/* Strisce verticali: disegno rect e li maschero con la forma della maglia */}
-      {/* Uso un <g> con la proprietà CSS clip-path su un path inline */}
-      {k.t === "sv" && (
-        <g style={{clipPath:`path('${bd}')`}}>
-          {stripes}
-        </g>
-      )}
-
-      {/* Metà destra per halves */}
-      {k.t === "h" && (
-        <g style={{clipPath:`path('${bd}')`}}>
-          <rect x={W/2} y={0} width={W/2} height={H} fill={k.s}/>
-        </g>
-      )}
-
-      {/* Contorno */}
-      <path d={bd} fill="none" stroke={sk} strokeWidth="0.8"/>
-
-      {/* Maniche */}
-      <path d={ml} fill={k.s}/>
-      <path d={mr} fill={k.s}/>
-      {k.t === "sv" && <>
-        <g style={{clipPath:`path('${ml}')`}}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={H} fill={i%2===0?k.p:k.s}/>)}</g>
-        <g style={{clipPath:`path('${mr}')`}}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={H} fill={i%2===0?k.p:k.s}/>)}</g>
-      </>}
-      <path d={ml} fill="none" stroke={sk} strokeWidth="0.6"/>
-      <path d={mr} fill="none" stroke={sk} strokeWidth="0.6"/>
-
-      {/* Colletto */}
+    <svg width={size} height={Math.round(size*1.2)} viewBox="0 0 60 72" style={{display:"block",flexShrink:0}}>
+      <defs>
+        <clipPath id={`${u}b`}><path d={body}/></clipPath>
+        <clipPath id={`${u}l`}><path d={slvL}/></clipPath>
+        <clipPath id={`${u}r`}><path d={slvR}/></clipPath>
+      </defs>
+      <path d={body} fill={k.p}/>
+      {k.t==="sv" && <g clipPath={`url(#${u}b)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
+      {k.t==="h" && <rect x={30} y={0} width={30} height={72} fill={k.s} clipPath={`url(#${u}b)`}/>}
+      <path d={body} fill="none" stroke={sk} strokeWidth="0.8"/>
+      <path d={slvL} fill={k.s}/>
+      {k.t==="sv" && <g clipPath={`url(#${u}l)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
+      <path d={slvL} fill="none" stroke={sk} strokeWidth="0.6"/>
+      <path d={slvR} fill={k.s}/>
+      {k.t==="sv" && <g clipPath={`url(#${u}r)`}>{[0,1,2,3].map(i=><rect key={i} x={i*15} y={0} width={15} height={72} fill={i%2===0?k.p:k.s}/>)}</g>}
+      <path d={slvR} fill="none" stroke={sk} strokeWidth="0.6"/>
       <ellipse cx={30} cy={7} rx={6} ry={3} fill={k.s} stroke={sk} strokeWidth="0.4"/>
     </svg>
   );
@@ -243,10 +219,13 @@ function TeamPicker({onSelect, onClose}) {
 /* ═══════════════════════════════════════════════════════════════════════════
    PLAYER SEARCH
    ═══════════════════════════════════════════════════════════════════════════ */
-function PlayerSearch({onSelect, onClose, role, lineup}) {
+function PlayerSearch({onSelect, onClose, role, lineup, isAlt}) {
   const th = useContext(ThemeCtx); const T = THEMES[th];
   const [q,setQ]=useState("");const [pf,setPf]=useState("ALL");const [cf,setCf]=useState("ALL");
-  const [minR,setMinR]=useState(60);const [maxA,setMaxA]=useState(40);const [footF,setFootF]=useState("ALL");
+  const [minR,setMinR]=useState(60);const [minA,setMinA]=useState(16);const [maxA,setMaxA]=useState(40);
+  const [minW,setMinW]=useState(0);const [maxW,setMaxW]=useState(15);
+  const [minV,setMinV]=useState(0);const [maxV,setMaxV]=useState(200);
+  const [footF,setFootF]=useState("ALL");
   const [conF,setConF]=useState("ALL");const [adv,setAdv]=useState(false);
   const ref=useRef();
   useEffect(()=>{const t=setTimeout(()=>ref.current?.focus(),400);return()=>clearTimeout(t);},[]);
@@ -259,7 +238,13 @@ function PlayerSearch({onSelect, onClose, role, lineup}) {
     if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]?.includes(p.position)))return false;
     if(cf!=="ALL"&&p.club!==cf)return false;
     if(p.rating<minR)return false;
-    if(p.age>maxA&&maxA<40)return false;
+    if(p.age<minA)return false;
+    if(maxA<40&&p.age>maxA)return false;
+    const wM=p.wage/1000;
+    if(wM<minW)return false;
+    if(maxW<15&&wM>maxW)return false;
+    if(p.value<minV)return false;
+    if(maxV<200&&p.value>maxV)return false;
     if(footF!=="ALL"&&p.foot!==footF)return false;
     if(conF==="exp"&&p.contract>2026)return false;
     if(conF==="safe"&&p.contract<=2026)return false;
@@ -274,7 +259,7 @@ function PlayerSearch({onSelect, onClose, role, lineup}) {
         <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:T.text}}>
-              Scegli giocatore {role&&<span style={{marginLeft:7,fontSize:11,color:POSITION_COLORS[role]||"#6b7280",background:(POSITION_COLORS[role]||"#6b7280")+"22",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{role}</span>}
+              {isAlt?"Scegli riserva":"Scegli giocatore"} {role&&<span style={{marginLeft:7,fontSize:11,color:POSITION_COLORS[role]||"#6b7280",background:(POSITION_COLORS[role]||"#6b7280")+"22",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{role}</span>}
             </div>
             <button onClick={onClose} style={{background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:20}}>✕</button>
           </div>
@@ -292,7 +277,12 @@ function PlayerSearch({onSelect, onClose, role, lineup}) {
               </select>
             </div>
             {[{l:"Rating min",v:minR,s:setMinR,mn:60,mx:90,st:1,cl:"#ffd700",f:v=>v},
-              {l:"Età max",v:maxA,s:setMaxA,mn:18,mx:40,st:1,cl:"#3b82f6",f:v=>v>=40?"∞":v+"a"},
+              {l:"Età min",v:minA,s:setMinA,mn:16,mx:40,st:1,cl:"#3b82f6",f:v=>v<=16?"—":v+"a"},
+              {l:"Età max",v:maxA,s:setMaxA,mn:16,mx:40,st:1,cl:"#3b82f6",f:v=>v>=40?"∞":v+"a"},
+              {l:"Stip. min M/a",v:minW,s:setMinW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v<=0?"—":"€"+v+"M"},
+              {l:"Stip. max M/a",v:maxW,s:setMaxW,mn:0,mx:15,st:0.5,cl:"#f59e0b",f:v=>v>=15?"∞":"€"+v+"M"},
+              {l:"Valore min €M",v:minV,s:setMinV,mn:0,mx:200,st:5,cl:"#16a34a",f:v=>v<=0?"—":"€"+v+"M"},
+              {l:"Valore max €M",v:maxV,s:setMaxV,mn:0,mx:200,st:5,cl:"#16a34a",f:v=>v>=200?"∞":"€"+v+"M"},
             ].map(x=><div key={x.l} style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:10,color:T.dim,width:64}}>{x.l}</span>
               <input type="range" min={x.mn} max={x.mx} step={x.st} value={x.v} onChange={e=>x.s(+e.target.value)} style={{flex:1,accentColor:x.cl}}/>
@@ -403,7 +393,7 @@ function LineupList({lineup,alts,form,onRemove,onRemoveAlt,onSlot,stats,cap,setC
           const rc2=POSITION_COLORS[pos.role]||"#6b7280";
           return(<div key={pos.slot} style={{borderBottom:`1px solid ${T.border}`}}>
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",cursor:p?"default":"pointer",minHeight:34}}
-              onClick={()=>{if(!p)onSlot(pos.slot);}}>
+              onClick={()=>onSlot(pos.slot)}>
               <div style={{width:24,fontSize:8,fontWeight:700,color:rc2,background:rc2+"22",borderRadius:3,textAlign:"center",padding:"2px",flexShrink:0}}>{pos.role}</div>
               {p?<>
                 <KitSVG club={p.club} size={22}/>
@@ -493,7 +483,7 @@ function SquadStats({lineup}) {
       </div>
       <div style={{padding:"2px 0"}}>
         {[{l:"Rating medio",v:avg("rating").toFixed(1),c:rc(avg("rating"))},{l:"Età media",v:`${avg("age").toFixed(1)}a`},
-          {l:"Valore totale",v:`€${sum("value")}M`,c:"#16a34a"},{l:"Stipendi/anno",v:`€${sum("wage").toLocaleString("it-IT")}K`,c:"#f59e0b"},
+          {l:"Valore totale",v:`€${sum("value")}M`,c:"#16a34a"},{l:"Stipendi/anno",v:`€${(sum("wage")/1000).toFixed(1)}M`,c:"#f59e0b"},
           {l:"Mancini",v:`${f.filter(p=>p.foot==="L").length}/${f.length}`,c:"#ec4899"},
           {l:"In scadenza ⚠",v:`${f.filter(p=>p.contract<=2026).length}`,c:f.some(p=>p.contract<=2026)?"#ef4444":T.dim},
         ].map(s=><div key={s.l} style={{display:"flex",justifyContent:"space-between",padding:"4px 12px",borderBottom:`1px solid ${T.border}`}}>
@@ -578,7 +568,8 @@ export default function App() {
 
   const [stats,  setStats]      = useState(["rating"]);
   const [kits,   setKits]       = useState(false);
-  const [picking,setPicking]    = useState(null);   // {slot, role}
+  const [picking,setPicking]    = useState(null);   // {slot, role, isAlt}
+  const [altMode,setAltMode]   = useState(false);
   const [teamPicker,setTeamPicker] = useState(false);
   const [altPick,setAltPick]    = useState(null);   // player object
   const [pending,setPending]    = useState(null);    // team to confirm
@@ -632,12 +623,20 @@ export default function App() {
   // ── Slot click → open search ────────────────────────────────────────────
   const slotClick = slot => {
     const pos=(FORMATIONS[form]?.positions||[]).find(p=>p.slot===slot);
-    setPicking({slot,role:pos?.role||null});
+    if (altMode && lineup[slot]) {
+      setPicking({slot,role:pos?.role||null,isAlt:true});
+    } else {
+      setPicking({slot,role:pos?.role||null,isAlt:false});
+    }
   };
 
   const selectPlayer = player => {
     if(!picking)return;
-    setLineup(prev=>{const n=[...prev];n[picking.slot]=player;return n;});
+    if(picking.isAlt) {
+      setAlts(prev=>({...prev,[picking.slot]:player.id}));
+    } else {
+      setLineup(prev=>{const n=[...prev];n[picking.slot]=player;return n;});
+    }
     setPicking(null);
   };
 
@@ -645,9 +644,8 @@ export default function App() {
   const handleDrop = useCallback((targetSlot, data) => {
     setLineup(prev => {
       const next = [...prev];
-      if (data.slot !== undefined && data.slot !== null) {
-        // Swap: drag from slot to slot
-        const fromPlayer = PLAYERS.find(p=>p.id===data.id);
+      if (data.slot !== undefined && data.slot !== null && data.slot !== targetSlot) {
+        // Swap
         [next[data.slot], next[targetSlot]] = [next[targetSlot], next[data.slot]];
       } else {
         // From search/bench: just place
@@ -705,6 +703,7 @@ export default function App() {
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
             <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} style={{background:T.inpBg,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:13}}>{theme==="dark"?"☀️":"🌙"}</button>
+            <button onClick={()=>setAltMode(a=>!a)} title="Riserve" style={{background:altMode?"rgba(22,163,74,0.2)":T.inpBg,border:`1px solid ${altMode?"#16a34a":T.border}`,color:altMode?"#16a34a":T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11,fontWeight:altMode?700:400}}>{altMode?"↕ ON":"↕"}</button>
             <button onClick={save} style={{background:T.inpBg,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>💾</button>
             <button onClick={()=>setShowSaved(s=>!s)} style={{background:showSaved?"#16a34a18":T.inpBg,border:`1px solid ${showSaved?"#16a34a":T.border}`,color:showSaved?"#16a34a":T.text,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:11}}>📁{saved.length>0&&` (${saved.length})`}</button>
             <button onClick={share} style={{background:"#16a34a",border:"none",color:"#fff",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:700}}>🔗</button>
@@ -746,7 +745,7 @@ export default function App() {
         </main>
 
         {teamPicker&&<TeamPicker onSelect={loadTeam} onClose={()=>setTeamPicker(false)}/>}
-        {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup}/>}
+        {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup} isAlt={picking.isAlt||false}/>}
         {altPick&&<AltPicker player={altPick} lineup={lineup} positions={positions} onSelect={altSlotSelect} onClose={()=>setAltPick(null)}/>}
         {pending&&<ConfirmModal team={pending} onOk={()=>doLoad(pending)} onNo={()=>setPending(null)}/>}
         {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
