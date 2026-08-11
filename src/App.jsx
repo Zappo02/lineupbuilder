@@ -637,12 +637,14 @@ export default function App(){
             {mode==="compare"&&<CompareHeader t1={{name,color}} t2={{name:name2,color:color2}} lu1={lineup} lu2={lineup2}/>}
             <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/>
           </div>
-          {mode==="compare"?
-            <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={(s,d)=>{setLineup2(prev=>{const n=[...prev];if(d.slot!==undefined&&d.slot!==null&&d.slot!==s){[n[d.slot],n[s]]=[n[s],n[d.slot]];}else if(d.id){const p=PLAYERS.find(x=>x.id===d.id);if(p)n[s]=p;}return n;});}} onClick={s=>{const pos=(FORMATIONS[form2]?.positions||[]).find(p=>p.slot===s);setPicking({slot:s,role:pos?.role||null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={()=>{}} coach={coach2}/>
-          :<div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt} onSlot={slotClick} stats={stats} cap={cap} setCap={setCap} numbers={numbers} setNumbers={setNumbers}/>
-            <BenchPanel bench={bench} lineup={lineup} alts={alts} onSetAlt={benchClick} stats={stats} cap={cap} setCap={setCap}/>
-          </div>}
+          {mode==="compare"?(
+            <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={(s,d)=>{setLineup2(prev=>{const n=[...prev];if(d.slot!==undefined&&d.slot!==null&&d.slot!==s){[n[d.slot],n[s]]=[n[s],n[d.slot]];}else if(d.id){const p=PLAYERS.find(x=>x.id===d.id);if(p)n[s]=p;}return n;});}} onClick={s=>{const pos=(FORMATIONS[form2]?.positions||[]).find(p=>p.slot===s);setPicking({slot:s,role:pos?.role||null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={()=>{}} coach={coach2} numbers={{}}/>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt} onSlot={slotClick} stats={stats} cap={cap} setCap={setCap} numbers={numbers} setNumbers={setNumbers}/>
+              <BenchPanel bench={bench} lineup={lineup} alts={alts} onSetAlt={benchClick} stats={stats} cap={cap} setCap={setCap}/>
+            </div>
+          )}
           {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
         </main>
         {teamPicker&&<TeamPicker onSelect={loadTeam} onClose={()=>setTeamPicker(false)}/>}
