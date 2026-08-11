@@ -22,29 +22,35 @@ const dec=s=>{try{return JSON.parse(decodeURIComponent(escape(atob(s))));}catch{
 function KitSVG({color="#16a34a",size=32,isGK=false}) {
   const th=useContext(ThCtx);
   const c=isGK?"#d4a017":color;
-  const light=isGK?"#e6b422":lighten(c,30);
-  const dark=isGK?"#b8860b":darken(c,20);
-  const sk=th==="dark"?"rgba(255,255,255,0.15)":"rgba(0,0,0,0.15)";
+  const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+  const lt=`rgb(${Math.min(255,r+40)},${Math.min(255,g+40)},${Math.min(255,b+40)})`;
+  const dk=`rgb(${Math.max(0,r-30)},${Math.max(0,g-30)},${Math.max(0,b-30)})`;
+  const sk=th==="dark"?"rgba(255,255,255,0.2)":"rgba(0,0,0,0.2)";
+  const uid=`kg${size}${c.replace('#','')}`;
   return(
     <svg width={size} height={Math.round(size*1.2)} viewBox="0 0 60 72" style={{display:"block",flexShrink:0}}>
       <defs>
-        <linearGradient id={`kg${size}${c.replace('#','')}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={light}/>
-          <stop offset="100%" stopColor={dark}/>
+        <linearGradient id={uid} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stopColor={lt}/><stop offset="100%" stopColor={dk}/>
         </linearGradient>
       </defs>
       {/* Body */}
-      <path d="M15,17 Q30,10 45,17 L48,70 L12,70 Z" fill={`url(#kg${size}${c.replace('#','')})`}/>
+      <path d="M15,17 Q30,10 45,17 L48,70 L12,70 Z" fill={`url(#${uid})`}/>
+      {/* Side accent stripe */}
+      <rect x="12" y="30" width="2.5" height="40" rx="1" fill="rgba(255,255,255,0.12)"/>
+      <rect x="45.5" y="30" width="2.5" height="40" rx="1" fill="rgba(255,255,255,0.12)"/>
+      {/* Chest highlight */}
+      <path d="M22,22 Q30,18 38,22 L36,35 Q30,37 24,35 Z" fill="rgba(255,255,255,0.06)"/>
       {/* Sleeves */}
-      <path d="M15,17 L3,26 L7,36 L15,30 Z" fill={dark}/>
-      <path d="M45,17 L57,26 L53,36 L45,30 Z" fill={dark}/>
+      <path d="M15,17 L3,26 L7,36 L15,30 Z" fill={dk}/>
+      <path d="M45,17 L57,26 L53,36 L45,30 Z" fill={dk}/>
       {/* Collar */}
-      <path d="M24,17 L30,22 L36,17" fill="none" stroke={sk} strokeWidth="1.5" strokeLinecap="round"/>
-      {/* Shoulder seams */}
-      <line x1="15" y1="17" x2="15" y2="30" stroke={sk} strokeWidth="0.4"/>
-      <line x1="45" y1="17" x2="45" y2="30" stroke={sk} strokeWidth="0.4"/>
-      {/* Bottom hem highlight */}
-      <line x1="14" y1="69" x2="46" y2="69" stroke="rgba(255,255,255,0.15)" strokeWidth="0.8"/>
+      <path d="M22,17 L30,22 L38,17" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.8" strokeLinecap="round"/>
+      <circle cx="30" cy="15" r="1" fill="rgba(255,255,255,0.2)"/>
+      {/* Seams */}
+      <line x1="15" y1="17" x2="15" y2="30" stroke={sk} strokeWidth="0.3"/>
+      <line x1="45" y1="17" x2="45" y2="30" stroke={sk} strokeWidth="0.3"/>
+      <line x1="14" y1="69" x2="46" y2="69" stroke="rgba(255,255,255,0.12)" strokeWidth="0.6"/>
       {/* Outline */}
       <path d="M15,17 Q30,10 45,17 L48,70 L12,70 Z" fill="none" stroke={sk} strokeWidth="0.5"/>
       <path d="M15,17 L3,26 L7,36 L15,30" fill="none" stroke={sk} strokeWidth="0.4"/>
@@ -52,8 +58,6 @@ function KitSVG({color="#16a34a",size=32,isGK=false}) {
     </svg>
   );
 }
-function lighten(hex,pct){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${Math.min(255,r+pct)},${Math.min(255,g+pct)},${Math.min(255,b+pct)})`;}
-function darken(hex,pct){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${Math.max(0,r-pct)},${Math.max(0,g-pct)},${Math.max(0,b-pct)})`;}
 
 // ═══ STAT BADGES ════════════════════════════════════════════════════════════
 function StatBadges({player,stats}){
@@ -181,50 +185,85 @@ function PitchView({lineup,alts,form,onDrop,onClick,name,color,stats,kits,cap,cu
 }
 
 // ═══ EXPORT CANVAS ══════════════════════════════════════════════════════════
-function ExportCanvas({lineup,form,name,color,stats,coach,onDone}){
+function ExportCanvas({lineup,form,name,color,stats,coach,onDone,customPos={}}){
   const ref=useRef();
   useEffect(()=>{
-    const c=ref.current,ctx=c.getContext("2d");const W=800,H=1000;c.width=W;c.height=H;
-    const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#0a0e1a");bg.addColorStop(1,"#111827");
+    const c=ref.current,ctx=c.getContext("2d");const W=800,H=1100;c.width=W;c.height=H;
+    // Background gradient
+    const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#0a0e1a");bg.addColorStop(0.15,"#111827");bg.addColorStop(1,"#0a0e1a");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-    ctx.fillStyle=color||"#16a34a";ctx.fillRect(0,0,W,70);
-    ctx.fillStyle="#fff";ctx.font="bold 32px sans-serif";ctx.textAlign="center";ctx.fillText(name.toUpperCase(),W/2,38);
-    if(coach){ctx.font="16px sans-serif";ctx.fillStyle="rgba(255,255,255,0.7)";ctx.fillText(`${coach} · ${form}`,W/2,60);}
-    else{ctx.font="16px sans-serif";ctx.fillStyle="rgba(255,255,255,0.7)";ctx.fillText(form,W/2,60);}
-    const fg=ctx.createLinearGradient(40,90,40,840);fg.addColorStop(0,"#1a4d2e");fg.addColorStop(1,"#1d5c35");
-    ctx.fillStyle=fg;ctx.beginPath();ctx.roundRect(40,90,W-80,750,8);ctx.fill();
-    const positions=FORMATIONS[form]?.positions||[];
+    // Header bar
+    const hg=ctx.createLinearGradient(0,0,W,0);hg.addColorStop(0,color||"#16a34a");hg.addColorStop(1,(color||"#16a34a")+"cc");
+    ctx.fillStyle=hg;ctx.beginPath();ctx.roundRect(0,0,W,80,0);ctx.fill();
+    // Team name
+    ctx.fillStyle="#fff";ctx.font="900 38px 'Barlow Condensed',sans-serif";ctx.textAlign="center";ctx.fillText(name.toUpperCase(),W/2,42);
+    // Coach + formation
+    ctx.font="400 16px sans-serif";ctx.fillStyle="rgba(255,255,255,0.75)";
+    ctx.fillText(coach?coach+" · "+form:form,W/2,66);
+    // Field
+    const FY=95,FH=780;
+    const fg=ctx.createLinearGradient(40,FY,40,FY+FH);fg.addColorStop(0,"#1a5c35");fg.addColorStop(1,"#1a4d2e");
+    ctx.fillStyle=fg;ctx.beginPath();ctx.roundRect(40,FY,W-80,FH,10);ctx.fill();
+    // Field stripes
+    for(let i=0;i<8;i++){ctx.fillStyle=i%2===0?"rgba(0,0,0,0.04)":"rgba(255,255,255,0.015)";ctx.fillRect(40,FY+i*(FH/8),W-80,FH/8);}
+    // Field lines
+    ctx.strokeStyle="rgba(255,255,255,0.25)";ctx.lineWidth=1.5;
+    ctx.strokeRect(60,FY+10,W-120,FH-20);
+    ctx.beginPath();ctx.moveTo(60,FY+FH/2);ctx.lineTo(W-60,FY+FH/2);ctx.stroke();
+    ctx.beginPath();ctx.arc(W/2,FY+FH/2,50,0,Math.PI*2);ctx.stroke();
+    ctx.strokeRect(120,FY+10,W-240,120);ctx.strokeRect(120,FY+FH-130,W-240,120);
+    // Players
+    const base=FORMATIONS[form]?.positions||[];
+    const positions=base.map(p=>customPos[p.slot]?{...p,x:customPos[p.slot].x,y:customPos[p.slot].y}:p);
     positions.forEach(pos=>{const pl=lineup[pos.slot];if(!pl)return;
-      const px=60+(pos.x/100)*(W-120),py=100+(pos.y/100)*730;
+      const px=60+(pos.x/100)*(W-120),py=FY+10+(pos.y/100)*(FH-20);
       const col=POSITION_COLORS[pos.role]||"#6b7280";
-      ctx.beginPath();ctx.arc(px,py,26,0,Math.PI*2);ctx.fillStyle=col+"33";ctx.fill();
+      // Glow
+      ctx.shadowColor=color||col;ctx.shadowBlur=15;
+      ctx.beginPath();ctx.arc(px,py,28,0,Math.PI*2);ctx.fillStyle=col+"44";ctx.fill();
+      ctx.shadowBlur=0;
       ctx.strokeStyle=color||col;ctx.lineWidth=3;ctx.stroke();
-      ctx.fillStyle=col;ctx.font="bold 16px sans-serif";ctx.textAlign="center";ctx.fillText(ini(pl.name),px,py+6);
-      const rc2=rcol(pl.rating);ctx.fillStyle=rc2;ctx.beginPath();ctx.roundRect(px+14,py-34,24,16,3);ctx.fill();
-      ctx.fillStyle="#000";ctx.font="bold 11px sans-serif";ctx.fillText(pl.rating,px+26,py-22);
-      ctx.fillStyle="rgba(0,0,0,0.85)";ctx.beginPath();ctx.roundRect(px-36,py+29,72,22,4);ctx.fill();
-      ctx.fillStyle="#9ca3af";ctx.font="bold 8px sans-serif";ctx.fillText(pos.role,px,py+38);
-      ctx.fillStyle="#fff";ctx.font="bold 10px sans-serif";
-      ctx.fillText(pl.shortName.length>10?pl.shortName.slice(0,10)+".":pl.shortName,px,py+49);
+      // Initials
+      ctx.fillStyle="#fff";ctx.font="800 17px sans-serif";ctx.textAlign="center";ctx.fillText(ini(pl.name),px,py+6);
+      // Rating
+      ctx.fillStyle=rcol(pl.rating);ctx.beginPath();ctx.roundRect(px+16,py-36,26,18,4);ctx.fill();
+      ctx.fillStyle="#000";ctx.font="bold 12px sans-serif";ctx.fillText(pl.rating,px+29,py-23);
+      // Name tag
+      ctx.fillStyle="rgba(0,0,0,0.8)";ctx.beginPath();ctx.roundRect(px-40,py+30,80,24,5);ctx.fill();
+      ctx.fillStyle="#aaa";ctx.font="bold 8px sans-serif";ctx.fillText(pos.role,px,py+40);
+      ctx.fillStyle="#fff";ctx.font="bold 11px sans-serif";
+      ctx.fillText(pl.shortName.length>10?pl.shortName.slice(0,9)+"..":pl.shortName,px,py+51);
     });
+    // Stats bar
     const filled=lineup.filter(Boolean);
     if(filled.length){
-      ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(0,H-80,W,80);
-      [{l:"Rating",v:(filled.reduce((a,p)=>a+p.rating,0)/filled.length).toFixed(1),c:rcol(filled.reduce((a,p)=>a+p.rating,0)/filled.length)},
-       {l:"Valore",v:`€${filled.reduce((a,p)=>a+(p.value||0),0)}M`,c:"#16a34a"},
-       {l:"Età media",v:`${(filled.reduce((a,p)=>a+(p.age||0),0)/filled.length).toFixed(1)}a`,c:"#3b82f6"},
-       {l:"Giocatori",v:`${filled.length}/11`,c:"#9ca3af"},
-      ].forEach((s,i)=>{const x=W/4*i+W/8;
-        ctx.fillStyle=s.c;ctx.font="bold 22px sans-serif";ctx.textAlign="center";ctx.fillText(s.v,x,H-42);
-        ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="11px sans-serif";ctx.fillText(s.l,x,H-22);
+      const SY=FY+FH+15;
+      ctx.fillStyle="rgba(255,255,255,0.03)";ctx.beginPath();ctx.roundRect(40,SY,W-80,90,10);ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(40,SY,W-80,90,10);ctx.stroke();
+      const avgR=(filled.reduce((a,p)=>a+p.rating,0)/filled.length).toFixed(1);
+      const avgA=(filled.reduce((a,p)=>a+(p.age||0),0)/filled.length).toFixed(1);
+      const totV=filled.reduce((a,p)=>a+(p.value||0),0);
+      const totW=(filled.reduce((a,p)=>a+(p.wage||0),0)/1000).toFixed(1);
+      const metrics=[
+        {l:"OVR",v:avgR,c:rcol(parseFloat(avgR))},
+        {l:"Valore",v:"€"+totV+"M",c:"#16a34a"},
+        {l:"Stipendi/a",v:"€"+totW+"M",c:"#f59e0b"},
+        {l:"Età media",v:avgA+"a",c:"#3b82f6"},
+        {l:"Giocatori",v:filled.length+"/11",c:"#9ca3af"},
+      ];
+      metrics.forEach((m,i)=>{const x=40+(W-80)/5*i+(W-80)/10;
+        ctx.fillStyle=m.c;ctx.font="bold 24px sans-serif";ctx.textAlign="center";ctx.fillText(m.v,x,SY+38);
+        ctx.fillStyle="rgba(255,255,255,0.35)";ctx.font="11px sans-serif";ctx.fillText(m.l,x,SY+58);
       });
     }
-    ctx.fillStyle="rgba(255,255,255,0.15)";ctx.font="bold 12px sans-serif";ctx.textAlign="right";ctx.fillText("universosportivo.com",W-20,H-8);
-    const a=document.createElement("a");a.download=`${name.replace(/\s/g,"-")}-lineup.png`;a.href=c.toDataURL("image/png");a.click();onDone();
+    // Watermark
+    ctx.fillStyle="rgba(255,255,255,0.12)";ctx.font="bold 11px sans-serif";ctx.textAlign="right";
+    ctx.fillText("universosportivo.com",W-20,H-10);
+    // Download
+    const a=document.createElement("a");a.download=(name||"lineup").replace(/\s/g,"-")+"-lineup.png";a.href=c.toDataURL("image/png");a.click();onDone();
   },[]);
   return<canvas ref={ref} style={{display:"none"}}/>;
 }
-
 // ═══ TEAM PICKER ════════════════════════════════════════════════════════════
 function TeamPicker({onSelect,onClose}){const th=useContext(ThCtx);const T=TH[th];return(
   <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -250,8 +289,9 @@ function TeamPicker({onSelect,onClose}){const th=useContext(ThCtx);const T=TH[th
 );}
 
 // ═══ PLAYER SEARCH ══════════════════════════════════════════════════════════
-function PlayerSearch({onSelect,onClose,role,lineup,isAlt}){const th=useContext(ThCtx);const T=TH[th];
-  const[q,setQ]=useState("");const[pf,setPf]=useState("ALL");const[cf,setCf]=useState("ALL");
+function PlayerSearch({onSelect,onClose,role,lineup,isAlt,teamName}){const th=useContext(ThCtx);const T=TH[th];
+  const roleToFilter=r=>{if(!r)return"ALL";if(r==="GK")return"GK";if(["CB","RB","LB"].includes(r))return"DEF";if(["DM","CM","AM","RM","LM"].includes(r))return"MID";if(["ST","RW","LW"].includes(r))return"ATT";return"ALL";};
+  const[q,setQ]=useState("");const[pf,setPf]=useState(()=>roleToFilter(role));const[cf,setCf]=useState("ALL");
   const[minR,setMinR]=useState(60);const[minA,setMinA]=useState(16);const[maxA,setMaxA]=useState(40);
   const[minW,setMinW]=useState(0);const[maxW,setMaxW]=useState(15);const[minV,setMinV]=useState(0);const[maxV,setMaxV]=useState(200);
   const[footF,setFootF]=useState("ALL");const[conF,setConF]=useState("ALL");const[adv,setAdv]=useState(false);
@@ -279,6 +319,7 @@ function PlayerSearch({onSelect,onClose,role,lineup,isAlt}){const th=useContext(
           <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca per nome o club..." style={{width:"100%",background:T.ib,border:`1px solid ${T.bd}`,borderRadius:7,padding:"7px 11px",color:T.tx,fontSize:16,outline:"none",boxSizing:"border-box",marginBottom:7}}/>
           <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
             {["ALL","GK","DEF","MID","ATT"].map(g=>pill(pf===g,()=>setPf(g),g))}
+            {teamName&&teamName!=="La mia Squadra"&&pill(cf===teamName,()=>setCf(cf===teamName?"ALL":teamName),teamName,"#d97706")}
             <button onClick={()=>setAdv(s=>!s)} style={{marginLeft:"auto",padding:"3px 9px",borderRadius:5,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:adv?"rgba(99,102,241,0.2)":"transparent",borderColor:adv?"#6366f1":"rgba(128,128,128,0.3)",color:adv?"#6366f1":T.dm}}>⚙ {adv?"▲":"▼"}</button>
           </div>
           {adv&&<div style={{background:T.ib,borderRadius:8,padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
@@ -447,10 +488,38 @@ function AltPicker({player,lineup,positions,onSelect,onClose}){const th=useConte
 function Toast({msg,onDone}){useEffect(()=>{const t=setTimeout(onDone,2500);return()=>clearTimeout(t);},[onDone]);
   return<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#16a34a",color:"#fff",padding:"10px 20px",borderRadius:10,fontWeight:700,fontSize:14,zIndex:999,whiteSpace:"nowrap"}}>{msg}</div>;}
 
+function CompareHeader({t1,t2,lu1,lu2}){const th=useContext(ThCtx);const T=TH[th];
+  const avg=(lu,k)=>{const f=lu.filter(Boolean);return f.length?f.reduce((a,p)=>a+(p[k]||0),0)/f.length:0;};
+  const sum=(lu,k)=>lu.filter(Boolean).reduce((a,p)=>a+(p[k]||0),0);
+  const ms=[{l:"OVR",a:avg(lu1,"rating").toFixed(1),b:avg(lu2,"rating").toFixed(1),nA:avg(lu1,"rating"),nB:avg(lu2,"rating"),hi:true},
+    {l:"Età",a:avg(lu1,"age").toFixed(1)+"a",b:avg(lu2,"age").toFixed(1)+"a",nA:avg(lu1,"age"),nB:avg(lu2,"age"),hi:false},
+    {l:"Valore",a:"€"+sum(lu1,"value")+"M",b:"€"+sum(lu2,"value")+"M",nA:sum(lu1,"value"),nB:sum(lu2,"value"),hi:true},
+    {l:"Stip/a",a:"€"+(sum(lu1,"wage")/1000).toFixed(1)+"M",b:"€"+(sum(lu2,"wage")/1000).toFixed(1)+"M",nA:sum(lu1,"wage"),nB:sum(lu2,"wage"),hi:true}];
+  return(<div style={{background:T.pn,borderRadius:12,border:`1px solid ${T.bd}`,padding:"12px 14px",marginBottom:10}}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"center",marginBottom:8}}>
+      <div style={{textAlign:"center"}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:900,color:t1.color}}>{t1.name}</div><div style={{fontSize:9,color:T.dm}}>{lu1.filter(Boolean).length}/11</div></div>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:900,color:T.ft}}>VS</div>
+      <div style={{textAlign:"center"}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:900,color:t2.color}}>{t2.name}</div><div style={{fontSize:9,color:T.dm}}>{lu2.filter(Boolean).length}/11</div></div>
+    </div>
+    {ms.map(m=>{const aW=m.hi?m.nA>m.nB:m.nA<m.nB,bW=m.hi?m.nB>m.nA:m.nB<m.nA;
+      return(<div key={m.l} style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:4,alignItems:"center",marginBottom:4}}>
+        <div style={{textAlign:"right",fontSize:11,fontWeight:700,color:aW?t1.color:T.dm}}>{m.a}</div>
+        <div style={{fontSize:9,color:T.dm,textAlign:"center",minWidth:50}}>{m.l}</div>
+        <div style={{textAlign:"left",fontSize:11,fontWeight:700,color:bW?t2.color:T.dm}}>{m.b}</div>
+      </div>);})}
+  </div>);
+}
+
 // ═══ APP ═════════════════════════════════════════════════════════════════════
 export default function App(){
   const[theme,setTheme]=useState("dark");const T=TH[theme];
+  const[mode,setMode]=useState("single"); // single | compare
+  const[activeTeam,setActiveTeam]=useState(0);
   const[lineup,setLineup]=useState(Array(11).fill(null));
+  const[lineup2,setLineup2]=useState(Array(11).fill(null));
+  const[form2,setForm2Raw]=useState("4-3-3");
+  const[name2,setName2]=useState("Squadra B");const[color2,setColor2]=useState("#2563eb");
+  const[coach2,setCoach2]=useState("");
   const[form,setFormRaw]=useState("4-3-3");
   const[name,setName]=useState("La mia Squadra");const[color,setColor]=useState("#16a34a");
   const[alts,setAlts]=useState({});const[bench,setBench]=useState([]);const[cap,setCap]=useState(null);
@@ -494,7 +563,7 @@ export default function App(){
 
   const loadTeam=team=>{if(lineup.some(Boolean)){setPending(team);setTeamPicker(false);}else doLoad(team);};
   const slotClick=slot=>{const pos=(FORMATIONS[form]?.positions||[]).find(p=>p.slot===slot);if(altMode&&lineup[slot])setPicking({slot,role:pos?.role||null,isAlt:true});else setPicking({slot,role:pos?.role||null,isAlt:false});};
-  const selectPlayer=player=>{if(!picking)return;if(picking.isAlt)setAlts(prev=>({...prev,[picking.slot]:player.id}));else setLU(prev=>{const n=[...prev];n[picking.slot]=player;return n;});setPicking(null);};
+  const selectPlayer=player=>{if(!picking)return;if(picking.team===2){setLineup2(prev=>{const n=[...prev];n[picking.slot]=player;return n;});setPicking(null);return;}if(picking.isAlt)setAlts(prev=>({...prev,[picking.slot]:player.id}));else setLU(prev=>{const n=[...prev];n[picking.slot]=player;return n;});setPicking(null);};
   const handleDrop=useCallback((targetSlot,data)=>{setLU(prev=>{const next=[...prev];if(data.slot!==undefined&&data.slot!==null&&data.slot!==targetSlot){[next[data.slot],next[targetSlot]]=[next[targetSlot],next[data.slot]];}else if(data.id){const p=PLAYERS.find(x=>x.id===data.id);if(p)next[targetSlot]=p;}return next;});},[]);
   const handlePitchDrop=useCallback((slotIdx,xP,yP)=>{setCustomPos(prev=>({...prev,[slotIdx]:{x:xP,y:yP}}));},[]);
   const removePlayer=slot=>setLU(prev=>{const n=[...prev];n[slot]=null;return n;});
@@ -512,12 +581,16 @@ export default function App(){
     <ThCtx.Provider value={theme}>
       <div style={{minHeight:"100vh",background:T.bg,color:T.tx,fontFamily:"'Inter',sans-serif"}}>
         <style>{`*{box-sizing:border-box;}html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}input[type=range]{accent-color:#ffd700;}`}</style>
-        <header style={{background:T.hd,backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.bd}`,padding:"0 14px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}}>
+        <header style={{background:T.hd,backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.bd}`,padding:"0 14px",height:50,boxShadow:"0 2px 20px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:26,height:26,background:"linear-gradient(135deg,#16a34a,#059669)",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>⚽</div>
             <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:900,lineHeight:1,color:T.tx}}>LINEUP BUILDER</div><div style={{fontSize:8,color:T.dm,letterSpacing:"1.5px"}}>UNIVERSO SPORTIVO</div></div>
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",background:T.ib,borderRadius:7,border:`1px solid ${T.bd}`,overflow:"hidden"}}>
+              <button onClick={()=>setMode("single")} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="single"?"#16a34a":"transparent",color:mode==="single"?"#fff":T.dm}}>Builder</button>
+              <button onClick={()=>setMode("compare")} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="compare"?"#16a34a":"transparent",color:mode==="compare"?"#fff":T.dm}}>⚔️ VS</button>
+            </div>
             <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} style={{background:T.ib,border:`1px solid ${T.bd}`,color:T.tx,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:13}}>{theme==="dark"?"☀️":"🌙"}</button>
             <button onClick={undo} disabled={!past.current.length} title="Annulla" style={{background:T.ib,border:`1px solid ${T.bd}`,color:past.current.length?T.tx:T.ft,borderRadius:6,padding:"5px 8px",cursor:past.current.length?"pointer":"default",fontSize:12}}>↩</button>
             <button onClick={redo} disabled={!future.current.length} title="Ripristina" style={{background:T.ib,border:`1px solid ${T.bd}`,color:future.current.length?T.tx:T.ft,borderRadius:6,padding:"5px 8px",cursor:future.current.length?"pointer":"default",fontSize:12}}>↪</button>
@@ -533,25 +606,30 @@ export default function App(){
           :<div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{saved.map(e=>(<div key={e.id} onClick={()=>load(e)} style={{background:T.ib,border:`1px solid ${e.color}44`,borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:7}}>
             <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/><div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>{e.name}</div><div style={{fontSize:9,color:T.dm}}>{e.formation} · {e.date}</div></div></div>))}</div>}
         </div>}
-        <main style={{maxWidth:1160,margin:"0 auto",padding:"12px 10px",display:"grid",gridTemplateColumns:mobile?"1fr":"200px 1fr 200px 180px",gap:12,alignItems:"start"}}>
+        <main style={{maxWidth:1160,margin:"0 auto",padding:"12px 10px",display:"grid",gridTemplateColumns:mobile?"1fr":mode==="compare"?"180px 1fr 1fr 180px":"200px 1fr 200px 180px",gap:12,alignItems:"start"}}>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)} alt={altMode} setAlt={setAltMode} coach={coach} setCoach={setCoach}/>
             <StatSel stats={stats} setStats={setStats}/>
             <div style={{background:T.pn,borderRadius:10,border:`1px solid ${T.bd}`,padding:"8px 12px"}}>
               <button onClick={()=>{setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button></div>
           </div>
-          <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach}/>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div>
+            {mode==="compare"&&<CompareHeader t1={{name,color}} t2={{name:name2,color:color2}} lu1={lineup} lu2={lineup2}/>}
+            <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach}/>
+          </div>
+          {mode==="compare"?
+            <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={(s,d)=>{setLineup2(prev=>{const n=[...prev];if(d.slot!==undefined&&d.slot!==null&&d.slot!==s){[n[d.slot],n[s]]=[n[s],n[d.slot]];}else if(d.id){const p=PLAYERS.find(x=>x.id===d.id);if(p)n[s]=p;}return n;});}} onClick={s=>{const pos=(FORMATIONS[form2]?.positions||[]).find(p=>p.slot===s);setPicking({slot:s,role:pos?.role||null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={()=>{}} coach={coach2}/>
+          :<div style={{display:"flex",flexDirection:"column",gap:10}}>
             <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt} onSlot={slotClick} stats={stats} cap={cap} setCap={setCap}/>
             <BenchPanel bench={bench} lineup={lineup} alts={alts} onSetAlt={benchClick} stats={stats} cap={cap} setCap={setCap}/>
-          </div>
+          </div>}
           {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
         </main>
         {teamPicker&&<TeamPicker onSelect={loadTeam} onClose={()=>setTeamPicker(false)}/>}
-        {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup} isAlt={picking.isAlt||false}/>}
+        {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup} isAlt={picking.isAlt||false} teamName={name}/>}
         {altPick&&<AltPicker player={altPick} lineup={lineup} positions={positions} onSelect={altSlotSelect} onClose={()=>setAltPick(null)}/>}
         {pending&&<ConfirmModal team={pending} onOk={()=>doLoad(pending)} onNo={()=>setPending(null)}/>}
-        {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} stats={stats} coach={coach} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
+        {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} stats={stats} coach={coach} customPos={customPos} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
         {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
       </div>
     </ThCtx.Provider>);
