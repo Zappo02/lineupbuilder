@@ -13,7 +13,8 @@ const ini=n=>n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
 const rcol=r=>r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";
 const XLR={GK:"GK",ST:"ST",LS:"ST",RS:"ST",CF:"ST",LCB:"CB",RCB:"CB",CB:"CB",MCB:"CB",LB:"LB",LWB:"LB",RB:"RB",RWB:"RB",CDM:"DM",LCDM:"DM",RCDM:"DM",LCM:"CM",RCM:"CM",CM:"CM",CAM:"AM",LAM:"LW",RAM:"RW",LM:"LM",RM:"RM",LW:"LW",RW:"RW"};
 const SK="lu_v8";
-const enc=(lu,f,n,c,a,cp,co)=>{try{return btoa(unescape(encodeURIComponent(JSON.stringify({f,n,c,l:lu.map(s=>s?.id??null),a,cp,co}))));}catch{return"";}};
+const norm=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const enc=(lu,f,n,c,a,cp,co,nm)=>{try{return btoa(unescape(encodeURIComponent(JSON.stringify({f,n,c,l:lu.map(s=>s?.id??null),a,cp,co,nm}))));}catch{return"";}};
 const dec=s=>{try{return JSON.parse(decodeURIComponent(escape(atob(s))));}catch{return null;}};
 
 // ═══ KIT SVG — Monocromatico premium ════════════════════════════════════════
@@ -73,7 +74,7 @@ function StatBadges({player,stats}){
 }
 
 // ═══ PITCH SLOT ═════════════════════════════════════════════════════════════
-function PitchSlot({slot,pos,player,alt,onDrop,onClick,tColor,stats,kits,cap}){
+function PitchSlot({slot,pos,player,alt,onDrop,onClick,tColor,stats,kits,cap,numbers={}}){
   const[over,setOver]=useState(false);const th=useContext(ThCtx);const T=TH[th];
   const c=POSITION_COLORS[pos.role]||"#6b7280";const b=tColor||c;const cnt=useRef(0);
   const ds=e=>{if(!player)return;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",JSON.stringify({id:player.id,slot}));};
@@ -125,10 +126,13 @@ function PitchSlot({slot,pos,player,alt,onDrop,onClick,tColor,stats,kits,cap}){
         onClick={()=>onClick(slot)} style={{position:"relative",cursor:"grab",transform:over?"scale(1.15)":"scale(1)",transition:"transform .12s",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",touchAction:"none"}}>
         {kits?<KitSVG color={tColor||c} size={40} isGK={pos.role==="GK"}/>
           :<div style={{width:44,height:44,borderRadius:"50%",backgroundColor:c+"22",border:`3px solid ${b}`,boxShadow:`0 0 10px ${b}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{ini(player.name)}</div>}
+        {stats.includes("age")&&<div style={{position:"absolute",top:-4,left:-4,background:"#3b82f6",color:"#fff",fontSize:7,fontWeight:800,borderRadius:3,padding:"0 2px",lineHeight:"13px"}}>{player.age}a</div>}
+        {stats.includes("foot")&&<div style={{position:"absolute",bottom:-2,left:-2,background:player.foot==="L"?"#ec4899":"#6b7280",color:"#fff",fontSize:6,fontWeight:800,borderRadius:2,padding:"0 2px",lineHeight:"11px"}}>{player.foot==="L"?"✦L":"R"}</div>}
+        {numbers[slot]&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",fontSize:9,fontWeight:900,color:"rgba(255,255,255,0.7)",textShadow:"0 1px 2px rgba(0,0,0,0.5)",pointerEvents:"none"}}>{numbers[slot]}</div>}
         {stats.includes("rating")&&<div style={{position:"absolute",top:-4,right:-4,background:rcol(player.rating),color:"#000",fontSize:8,fontWeight:800,borderRadius:3,padding:"0 2px",lineHeight:"13px",minWidth:13,textAlign:"center"}}>{player.rating}</div>}
       </div>
       <div style={{background:T.lb,borderRadius:5,padding:"1px 5px",maxWidth:82,textAlign:"center"}} onClick={()=>onClick(slot)}>
-        <div style={{fontSize:8,color:"#9ca3af",fontWeight:700}}>{pos.role}</div>
+        <div style={{fontSize:8,color:"#9ca3af",fontWeight:700}}>{pos.role}{pos.y<35&&pos.role!=="ST"&&pos.role!=="RW"&&pos.role!=="LW"?" ↑ATT":""}{pos.y>65&&pos.role!=="GK"&&pos.role!=="CB"&&pos.role!=="RB"&&pos.role!=="LB"?" ↓DIF":""}</div>
         <div style={{fontSize:10,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {cap===player.id&&<span style={{color:"#ffd700",marginRight:2}}>★</span>}{player.shortName}
         </div>
@@ -140,7 +144,7 @@ function PitchSlot({slot,pos,player,alt,onDrop,onClick,tColor,stats,kits,cap}){
 }
 
 // ═══ PITCH ═══════════════════════════════════════════════════════════════════
-function PitchView({lineup,alts,form,onDrop,onClick,name,color,stats,kits,cap,customPos={},onPitchDrop,coach}){
+function PitchView({lineup,alts,form,onDrop,onClick,name,color,stats,kits,cap,customPos={},onPitchDrop,coach,numbers={}}){
   const th=useContext(ThCtx);const T=TH[th];
   const base=FORMATIONS[form]?.positions||[];
   const positions=base.map(p=>customPos[p.slot]?{...p,x:customPos[p.slot].x,y:customPos[p.slot].y}:p);
@@ -178,14 +182,14 @@ function PitchView({lineup,alts,form,onDrop,onClick,name,color,stats,kits,cap,cu
       {positions.map(p=>(
         <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
           alt={alts[p.slot]?PLAYERS.find(x=>x.id===alts[p.slot])||null:null}
-          onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap}/>
+          onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap} numbers={numbers}/>
       ))}
     </div>
   );
 }
 
 // ═══ EXPORT CANVAS ══════════════════════════════════════════════════════════
-function ExportCanvas({lineup,form,name,color,stats,coach,onDone,customPos={}}){
+function ExportCanvas({lineup,form,name,color,stats,coach,onDone,customPos={},numbers={}}){
   const ref=useRef();
   useEffect(()=>{
     const c=ref.current,ctx=c.getContext("2d");const W=800,H=1100;c.width=W;c.height=H;
@@ -218,13 +222,27 @@ function ExportCanvas({lineup,form,name,color,stats,coach,onDone,customPos={}}){
     positions.forEach(pos=>{const pl=lineup[pos.slot];if(!pl)return;
       const px=60+(pos.x/100)*(W-120),py=FY+10+(pos.y/100)*(FH-20);
       const col=POSITION_COLORS[pos.role]||"#6b7280";
-      // Glow
-      ctx.shadowColor=color||col;ctx.shadowBlur=15;
-      ctx.beginPath();ctx.arc(px,py,28,0,Math.PI*2);ctx.fillStyle=col+"44";ctx.fill();
-      ctx.shadowBlur=0;
-      ctx.strokeStyle=color||col;ctx.lineWidth=3;ctx.stroke();
-      // Initials
-      ctx.fillStyle="#fff";ctx.font="800 17px sans-serif";ctx.textAlign="center";ctx.fillText(ini(pl.name),px,py+6);
+      // Draw kit on canvas
+      const kc=color||col;
+      const kr=parseInt(kc.slice(1,3),16)||80,kg=parseInt(kc.slice(3,5),16)||80,kb=parseInt(kc.slice(5,7),16)||80;
+      const klt=`rgb(${Math.min(255,kr+35)},${Math.min(255,kg+35)},${Math.min(255,kb+35)})`;
+      const kdk=`rgb(${Math.max(0,kr-25)},${Math.max(0,kg-25)},${Math.max(0,kb-25)})`;
+      const isGK=pos.role==="GK";
+      const sc=isGK?"#d4a017":kc;const slt=isGK?"#e6b422":klt;const sdk=isGK?"#b8860b":kdk;
+      // Body
+      const kg2=ctx.createLinearGradient(px-18,py-22,px+18,py+20);kg2.addColorStop(0,slt);kg2.addColorStop(1,sdk);
+      ctx.fillStyle=kg2;
+      ctx.beginPath();ctx.moveTo(px-14,py-18);ctx.quadraticCurveTo(px,py-24,px+14,py-18);ctx.lineTo(px+16,py+20);ctx.lineTo(px-16,py+20);ctx.closePath();ctx.fill();
+      // Sleeves
+      ctx.fillStyle=sdk;
+      ctx.beginPath();ctx.moveTo(px-14,py-18);ctx.lineTo(px-24,py-10);ctx.lineTo(px-20,py-2);ctx.lineTo(px-14,py-8);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(px+14,py-18);ctx.lineTo(px+24,py-10);ctx.lineTo(px+20,py-2);ctx.lineTo(px+14,py-8);ctx.closePath();ctx.fill();
+      // Collar
+      ctx.strokeStyle="rgba(255,255,255,0.3)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px-6,py-18);ctx.lineTo(px,py-14);ctx.lineTo(px+6,py-18);ctx.stroke();
+      // Number on kit
+      const num=customPos[pos.slot]?"":(numbers||{})[pos.slot]||"";
+      if(num){ctx.fillStyle="rgba(255,255,255,0.6)";ctx.font="bold 12px sans-serif";ctx.textAlign="center";ctx.fillText(num,px,py+6);}
+      else{ctx.fillStyle="rgba(255,255,255,0.7)";ctx.font="800 14px sans-serif";ctx.textAlign="center";ctx.fillText(ini(pl.name),px,py+4);}
       // Rating
       ctx.fillStyle=rcol(pl.rating);ctx.beginPath();ctx.roundRect(px+16,py-36,26,18,4);ctx.fill();
       ctx.fillStyle="#000";ctx.font="bold 12px sans-serif";ctx.fillText(pl.rating,px+29,py-23);
@@ -299,7 +317,7 @@ function PlayerSearch({onSelect,onClose,role,lineup,isAlt,teamName}){const th=us
   const PM={DEF:["CB","RB","LB"],MID:["DM","CM","AM","RM","LM"],ATT:["ST","RW","LW"]};
   const clubs=["ALL",...new Set(PLAYERS.map(p=>p.club))];const used=new Set(lineup.filter(Boolean).map(p=>p.id));
   const list=PLAYERS.filter(p=>{
-    if(!isAlt&&used.has(p.id))return false;if(q&&!p.name.toLowerCase().includes(q.toLowerCase())&&!p.club.toLowerCase().includes(q.toLowerCase()))return false;
+    if(!isAlt&&used.has(p.id))return false;if(q&&!norm(p.name).includes(norm(q))&&!norm(p.club).includes(norm(q)))return false;
     if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]?.includes(p.position)))return false;
     if(cf!=="ALL"&&p.club!==cf)return false;if(p.rating<minR)return false;if(minA>16&&p.age<minA)return false;if(maxA<40&&p.age>maxA)return false;
     const wM=p.wage/1000;if(minW>0&&wM<minW)return false;if(maxW<15&&wM>maxW)return false;
@@ -399,7 +417,7 @@ function StatSel({stats,setStats}){const th=useContext(ThCtx);const T=TH[th];con
   </div>);
 }
 
-function LineupList({lineup,alts,form,onRemove,onRemoveAlt,onSlot,stats,cap,setCap}){const th=useContext(ThCtx);const T=TH[th];const positions=FORMATIONS[form]?.positions||[];const sh=STAT_VIEWS.filter(s=>stats.includes(s.id)&&s.id!=="rating");
+function LineupList({lineup,alts,form,onRemove,onRemoveAlt,onSlot,stats,cap,setCap,numbers={},setNumbers}){const th=useContext(ThCtx);const T=TH[th];const positions=FORMATIONS[form]?.positions||[];const sh=STAT_VIEWS.filter(s=>stats.includes(s.id)&&s.id!=="rating");
   return(<div style={{background:T.pn,borderRadius:12,border:`1px solid ${T.bd}`,overflow:"hidden"}}>
     <div style={{padding:"9px 12px",borderBottom:`1px solid ${T.bd}`}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:T.tx}}>XI ({lineup.filter(Boolean).length}/11)</span></div>
     <div style={{maxHeight:480,overflowY:"auto"}}>{positions.map(pos=>{const p=lineup[pos.slot];const alt=alts[pos.slot]?PLAYERS.find(x=>x.id===alts[pos.slot]):null;const rc2=POSITION_COLORS[pos.role]||"#6b7280";
@@ -410,6 +428,8 @@ function LineupList({lineup,alts,form,onRemove,onRemoveAlt,onSlot,stats,cap,setC
             <div style={{fontSize:11,fontWeight:700,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cap===p.id&&<span style={{color:"#ffd700",marginRight:2}}>★</span>}{p.shortName}{p.foot==="L"&&<span style={{fontSize:8,color:"#ec4899",marginLeft:2}}>✦</span>}{p.contract<=2026&&<span style={{fontSize:8,color:"#ef4444",marginLeft:2}}>⚠</span>}</div>
             {sh.length>0&&<div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{sh.map(sv=>p[sv.id]!==undefined&&<span key={sv.id} style={{fontSize:8,color:sv.id==="contract"&&p.contract<=2026?"#ef4444":sv.color,fontWeight:700}}>{sv.id==="nation"?NATION_FLAGS[p.nation]||p.nation:sv.id==="foot"?(p.foot==="L"?"✦":"Dx"):`${sv.icon}${sv.format(p[sv.id])}`}</span>)}</div>}
           </div>{stats.includes("rating")&&<div style={{fontSize:10,fontWeight:800,color:rcol(p.rating),flexShrink:0}}>{p.rating}</div>}
+            <input value={numbers[pos.slot]||""} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setNumbers(prev=>({...prev,[pos.slot]:e.target.value.slice(0,2)}));}} placeholder="#" maxLength={2}
+              style={{width:22,background:T.ib,border:`1px solid ${T.bd}`,borderRadius:3,padding:"1px 2px",color:T.tx,fontSize:9,textAlign:"center",outline:"none",flexShrink:0}}/>
             <button onClick={e=>{e.stopPropagation();setCap(p.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:cap===p.id?"#ffd700":T.ft,padding:2,flexShrink:0}}>★</button>
             <button onClick={e=>{e.stopPropagation();onRemove(pos.slot);}} style={{background:"none",border:"none",color:T.ft,cursor:"pointer",fontSize:11,padding:2,flexShrink:0}}>✕</button>
           </>:<div style={{fontSize:10,color:T.ft,fontStyle:"italic"}}>+ Aggiungi {pos.role}</div>}
@@ -523,7 +543,7 @@ export default function App(){
   const[form,setFormRaw]=useState("4-3-3");
   const[name,setName]=useState("La mia Squadra");const[color,setColor]=useState("#16a34a");
   const[alts,setAlts]=useState({});const[bench,setBench]=useState([]);const[cap,setCap]=useState(null);
-  const[coach,setCoach]=useState("");const[customPos,setCustomPos]=useState({});
+  const[coach,setCoach]=useState("");const[numbers,setNumbers]=useState({});// {slot: "10"}const[customPos,setCustomPos]=useState({});
   const[stats,setStats]=useState(["rating"]);const[kits,setKits]=useState(true);const[altMode,setAltMode]=useState(false);
   const[picking,setPicking]=useState(null);const[teamPicker,setTeamPicker]=useState(false);
   const[altPick,setAltPick]=useState(null);const[pending,setPending]=useState(null);
@@ -537,7 +557,7 @@ export default function App(){
   const setLU=updater=>{setLineup(prev=>{pushUndo(prev);return typeof updater==="function"?updater(prev):updater;});};
 
   useEffect(()=>{
-    const hash=window.location.hash.slice(1);if(hash){const d=dec(hash);if(d){setLineup(d.l.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null));if(d.f)setFormRaw(d.f);if(d.n)setName(d.n);if(d.c)setColor(d.c);if(d.a)setAlts(d.a);if(d.cp)setCustomPos(d.cp);if(d.co)setCoach(d.co);}}
+    const hash=window.location.hash.slice(1);if(hash){const d=dec(hash);if(d){setLineup(d.l.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null));if(d.f)setFormRaw(d.f);if(d.n)setName(d.n);if(d.c)setColor(d.c);if(d.a)setAlts(d.a);if(d.cp)setCustomPos(d.cp);if(d.co)setCoach(d.co);if(d.nm)setNumbers(d.nm);}}
     setSaved(JSON.parse(localStorage.getItem(SK)||"[]"));
   },[]);
 
@@ -570,9 +590,9 @@ export default function App(){
   const removeAlt=slot=>setAlts(prev=>{const n={...prev};delete n[slot];return n;});
   const benchClick=player=>setAltPick(player);
   const altSlotSelect=slot=>{if(!altPick)return;setAlts(prev=>({...prev,[slot]:altPick.id}));setAltPick(null);setToast(`${altPick.shortName} → ↕`);};
-  const share=()=>{const code=enc(lineup,form,name,color,alts,customPos,coach);const url=`${location.origin}${location.pathname}#${code}`;navigator.clipboard.writeText(url).then(()=>setToast("Link copiato! 🔗")).catch(()=>{});};
-  const save=()=>{const s=JSON.parse(localStorage.getItem(SK)||"[]");const e={id:Date.now(),name,formation:form,color,lineup:lineup.map(p=>p?.id??null),alts,customPos,coach,date:new Date().toLocaleDateString("it-IT")};const u=[e,...s].slice(0,10);localStorage.setItem(SK,JSON.stringify(u));setSaved(u);setToast("Salvata! 💾");};
-  const load=entry=>{setLineup(entry.lineup.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null));setFormRaw(entry.formation);setName(entry.name);setColor(entry.color);setAlts(entry.alts||{});setCustomPos(entry.customPos||{});setCoach(entry.coach||"");setShowSaved(false);setToast("Caricata! ✅");};
+  const share=()=>{const code=enc(lineup,form,name,color,alts,customPos,coach,numbers);const url=`${location.origin}${location.pathname}#${code}`;navigator.clipboard.writeText(url).then(()=>setToast("Link copiato! 🔗")).catch(()=>{});};
+  const save=()=>{const s=JSON.parse(localStorage.getItem(SK)||"[]");const e={id:Date.now(),name,formation:form,color,lineup:lineup.map(p=>p?.id??null),alts,customPos,coach,numbers,date:new Date().toLocaleDateString("it-IT")};const u=[e,...s].slice(0,10);localStorage.setItem(SK,JSON.stringify(u));setSaved(u);setToast("Salvata! 💾");};
+  const load=entry=>{setLineup(entry.lineup.map(id=>id?PLAYERS.find(p=>p.id===id)||null:null));setFormRaw(entry.formation);setName(entry.name);setColor(entry.color);setAlts(entry.alts||{});setCustomPos(entry.customPos||{});setCoach(entry.coach||"");setNumbers(entry.numbers||{});setShowSaved(false);setToast("Caricata! ✅");};
   const positions=FORMATIONS[form]?.positions||[];
   const[mobile,setMobile]=useState(window.innerWidth<900);
   useEffect(()=>{const h=()=>setMobile(window.innerWidth<900);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
@@ -611,16 +631,16 @@ export default function App(){
             <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={()=>setTeamPicker(true)} alt={altMode} setAlt={setAltMode} coach={coach} setCoach={setCoach}/>
             <StatSel stats={stats} setStats={setStats}/>
             <div style={{background:T.pn,borderRadius:10,border:`1px solid ${T.bd}`,padding:"8px 12px"}}>
-              <button onClick={()=>{setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button></div>
+              <button onClick={()=>{setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});setNumbers({});}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171",borderRadius:6,padding:"6px",cursor:"pointer",fontSize:11,fontWeight:600}}>🗑 Svuota</button></div>
           </div>
           <div>
             {mode==="compare"&&<CompareHeader t1={{name,color}} t2={{name:name2,color:color2}} lu1={lineup} lu2={lineup2}/>}
-            <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach}/>
+            <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/>
           </div>
           {mode==="compare"?
             <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={(s,d)=>{setLineup2(prev=>{const n=[...prev];if(d.slot!==undefined&&d.slot!==null&&d.slot!==s){[n[d.slot],n[s]]=[n[s],n[d.slot]];}else if(d.id){const p=PLAYERS.find(x=>x.id===d.id);if(p)n[s]=p;}return n;});}} onClick={s=>{const pos=(FORMATIONS[form2]?.positions||[]).find(p=>p.slot===s);setPicking({slot:s,role:pos?.role||null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={()=>{}} coach={coach2}/>
           :<div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt} onSlot={slotClick} stats={stats} cap={cap} setCap={setCap}/>
+            <LineupList lineup={lineup} alts={alts} form={form} onRemove={removePlayer} onRemoveAlt={removeAlt} onSlot={slotClick} stats={stats} cap={cap} setCap={setCap} numbers={numbers} setNumbers={setNumbers}/>
             <BenchPanel bench={bench} lineup={lineup} alts={alts} onSetAlt={benchClick} stats={stats} cap={cap} setCap={setCap}/>
           </div>}
           {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
@@ -629,7 +649,7 @@ export default function App(){
         {picking&&<PlayerSearch onSelect={selectPlayer} onClose={()=>setPicking(null)} role={picking.role} lineup={lineup} isAlt={picking.isAlt||false} teamName={name}/>}
         {altPick&&<AltPicker player={altPick} lineup={lineup} positions={positions} onSelect={altSlotSelect} onClose={()=>setAltPick(null)}/>}
         {pending&&<ConfirmModal team={pending} onOk={()=>doLoad(pending)} onNo={()=>setPending(null)}/>}
-        {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} stats={stats} coach={coach} customPos={customPos} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
+        {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} stats={stats} coach={coach} customPos={customPos} numbers={numbers} onDone={()=>{setExporting(false);setToast("PNG scaricato! 📸");}}/>}
         {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
       </div>
     </ThCtx.Provider>);
