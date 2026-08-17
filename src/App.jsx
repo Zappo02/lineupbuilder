@@ -1,5 +1,5 @@
 import React,{useState,useRef,useEffect,useCallback,createContext,useContext} from"react";
-import{PLAYERS,FORMATIONS,POSITION_COLORS,STAT_VIEWS,SERIE_A_TEAMS,NATION_FLAGS,TEAM_COLORS}from"./data/players.js";
+import{PLAYERS,FORMATIONS,POSITION_COLORS,STAT_VIEWS,NATION_FLAGS,TEAM_COLORS,ALL_LEAGUES}from"./data/players.js";
 
 var ThCtx=createContext("dark");
 var TH={
@@ -158,73 +158,302 @@ function PitchView(props){
     </div>);
 }
 
+function drawKitCanvas(ctx,px,py,kc,isGK,scale){
+  scale=scale||1;
+  var s=scale;
+  var r=parseInt(kc.slice(1,3),16)||80,g=parseInt(kc.slice(3,5),16)||80,b=parseInt(kc.slice(5,7),16)||80;
+  var lt="rgb("+Math.min(255,r+50)+","+Math.min(255,g+50)+","+Math.min(255,b+50)+")";
+  var dk="rgb("+Math.max(0,r-40)+","+Math.max(0,g-40)+","+Math.max(0,b-40)+")";
+  var c=isGK?"#d4a017":kc;
+  var clt=isGK?"#e8c040":lt;
+  var cdk=isGK?"#a06010":dk;
+  // Body gradient (matches SVG viewBox 0 0 60 72 scaled)
+  var bw=30*s,bh=36*s;
+  var grd=ctx.createLinearGradient(px-bw*0.15,py-bh*0.28,px+bw*0.15,py+bh*0.72);
+  grd.addColorStop(0,clt);grd.addColorStop(1,cdk);
+  // Body trapezoid: M15,17 Q30,10 45,17 L48,70 L12,70 Z -> scale to canvas
+  var sc=function(vx,vy){return{x:px+(vx-30)*s,y:py+(vy-36)*s};};
+  ctx.beginPath();
+  var p0=sc(15,17),p1=sc(30,10),p2=sc(45,17),p3=sc(48,70),p4=sc(12,70);
+  ctx.moveTo(p0.x,p0.y);ctx.quadraticCurveTo(p1.x,p1.y,p2.x,p2.y);
+  ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
+  ctx.fillStyle=grd;ctx.fill();
+  // Left sleeve
+  var ls=[sc(15,17),sc(3,26),sc(7,36),sc(15,30)];
+  ctx.beginPath();ctx.moveTo(ls[0].x,ls[0].y);ls.forEach(function(p){ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fillStyle=cdk;ctx.fill();
+  // Right sleeve
+  var rs=[sc(45,17),sc(57,26),sc(53,36),sc(45,30)];
+  ctx.beginPath();ctx.moveTo(rs[0].x,rs[0].y);rs.forEach(function(p){ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fillStyle=cdk;ctx.fill();
+  // Collar V
+  var cp1=sc(24,17),cpM=sc(30,22),cp2=sc(36,17);
+  ctx.beginPath();ctx.moveTo(cp1.x,cp1.y);ctx.lineTo(cpM.x,cpM.y);ctx.lineTo(cp2.x,cp2.y);
+  ctx.strokeStyle="rgba(255,255,255,0.45)";ctx.lineWidth=1.6*s;ctx.lineCap="round";ctx.stroke();
+  // Side stripe highlights
+  var sl1a=sc(12,30),sl1b=sc(12,70);
+  ctx.beginPath();ctx.moveTo(sl1a.x,sl1a.y);ctx.lineTo(sl1b.x,sl1b.y);
+  ctx.strokeStyle="rgba(255,255,255,0.13)";ctx.lineWidth=2*s;ctx.stroke();
+  var sl2a=sc(48,30),sl2b=sc(48,70);
+  ctx.beginPath();ctx.moveTo(sl2a.x,sl2a.y);ctx.lineTo(sl2b.x,sl2b.y);ctx.stroke();
+  // Outline shadow
+  ctx.beginPath();
+  ctx.moveTo(p0.x,p0.y);ctx.quadraticCurveTo(p1.x,p1.y,p2.x,p2.y);
+  ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
+  ctx.strokeStyle="rgba(0,0,0,0.22)";ctx.lineWidth=0.8*s;ctx.stroke();
+}
+
 function ExportCanvas(props){
   var lineup=props.lineup,form=props.form,name=props.name,color=props.color,coach=props.coach,customPos=props.customPos||{},numbers=props.numbers||{},stats=props.stats||[],onDone=props.onDone;
   var ref=useRef();
   useEffect(function(){
-    var c=ref.current,ctx=c.getContext("2d");var W=800,H=1200;c.width=W;c.height=H;
-    var bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#080c18");bg.addColorStop(0.1,"#0f1623");bg.addColorStop(1,"#080c18");ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-    var hg=ctx.createLinearGradient(0,0,W,0);hg.addColorStop(0,color||"#16a34a");hg.addColorStop(1,(color||"#16a34a")+"aa");ctx.fillStyle=hg;ctx.fillRect(0,0,W,85);
-    ctx.fillStyle="#fff";ctx.font="900 40px sans-serif";ctx.textAlign="center";ctx.fillText(name.toUpperCase(),W/2,45);
-    ctx.font="400 16px sans-serif";ctx.fillStyle="rgba(255,255,255,0.7)";ctx.fillText(coach?coach+" - "+form:form,W/2,72);
-    ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="bold 11px sans-serif";ctx.textAlign="right";ctx.fillText("universosportivo.com",W-15,20);
-    var FY=100,FH=850;var fg=ctx.createLinearGradient(40,FY,40,FY+FH);fg.addColorStop(0,"#14532d");fg.addColorStop(1,"#166534");ctx.fillStyle=fg;ctx.beginPath();ctx.roundRect(40,FY,W-80,FH,10);ctx.fill();
-    for(var i=0;i<8;i++){ctx.fillStyle=i%2===0?"rgba(0,0,0,0.04)":"rgba(255,255,255,0.015)";ctx.fillRect(40,FY+i*(FH/8),W-80,FH/8);}
-    ctx.strokeStyle="rgba(255,255,255,0.25)";ctx.lineWidth=1.5;ctx.strokeRect(55,FY+10,W-110,FH-20);ctx.beginPath();ctx.moveTo(55,FY+FH/2);ctx.lineTo(W-55,FY+FH/2);ctx.stroke();ctx.beginPath();ctx.arc(W/2,FY+FH/2,50,0,Math.PI*2);ctx.stroke();
+    var c=ref.current,ctx=c.getContext("2d");
+    var W=900,H=1320;c.width=W;c.height=H;
+
+    // --- BACKGROUND ---
+    var bg=ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,"#060a14");bg.addColorStop(0.5,"#0b1220");bg.addColorStop(1,"#060a14");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+    // Subtle noise texture via diagonal lines
+    ctx.strokeStyle="rgba(255,255,255,0.015)";ctx.lineWidth=1;
+    for(var xi=0;xi<W+H;xi+=18){ctx.beginPath();ctx.moveTo(xi,0);ctx.lineTo(xi-H,H);ctx.stroke();}
+
+    // --- HEADER BAND ---
+    var kc0=color||"#16a34a";
+    var kr0=parseInt(kc0.slice(1,3),16)||80,kg0=parseInt(kc0.slice(3,5),16)||80,kb0=parseInt(kc0.slice(5,7),16)||80;
+    var hg=ctx.createLinearGradient(0,0,W,0);
+    hg.addColorStop(0,"rgb("+Math.max(0,kr0-20)+","+Math.max(0,kg0-20)+","+Math.max(0,kb0-20)+")");
+    hg.addColorStop(0.5,kc0);
+    hg.addColorStop(1,"rgb("+Math.max(0,kr0-30)+","+Math.max(0,kg0-30)+","+Math.max(0,kb0-30)+")");
+    ctx.fillStyle=hg;ctx.fillRect(0,0,W,90);
+
+    // Header bottom glow line
+    var gl=ctx.createLinearGradient(0,0,W,0);
+    gl.addColorStop(0,"transparent");gl.addColorStop(0.2,kc0);gl.addColorStop(0.8,kc0);gl.addColorStop(1,"transparent");
+    ctx.fillStyle=gl;ctx.fillRect(0,88,W,3);
+
+    // Team name in header
+    ctx.textAlign="center";
+    ctx.fillStyle="rgba(0,0,0,0.3)";ctx.font="900 48px 'Arial Black',sans-serif";ctx.fillText(name.toUpperCase(),W/2+2,58);
+    ctx.fillStyle="#ffffff";ctx.font="900 48px 'Arial Black',sans-serif";ctx.fillText(name.toUpperCase(),W/2,56);
+
+    // Formation + coach subline
+    var sub=coach?coach+" \u2022 "+form:form;
+    ctx.fillStyle="rgba(255,255,255,0.72)";ctx.font="500 17px sans-serif";ctx.fillText(sub,W/2,80);
+
+    // universosportivo.com - LEFT side of header, pill style
+    var brand="universosportivo.com";
+    ctx.font="bold 13px sans-serif";
+    var bw2=ctx.measureText(brand).width+22;
+    ctx.fillStyle="rgba(0,0,0,0.28)";
+    ctx.beginPath();ctx.roundRect(14,12,bw2,26,13);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(14,12,bw2,26,13);ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,0.9)";ctx.textAlign="left";
+    ctx.fillText(brand,14+11,30);
+
+    // --- PITCH ---
+    var FX=32,FY=104,FW=W-64,FH=920;
+    var fg=ctx.createLinearGradient(FX,FY,FX,FY+FH);
+    fg.addColorStop(0,"#14532d");fg.addColorStop(0.5,"#166534");fg.addColorStop(1,"#14532d");
+    ctx.fillStyle=fg;ctx.beginPath();ctx.roundRect(FX,FY,FW,FH,12);ctx.fill();
+
+    // Pitch stripes
+    for(var si=0;si<8;si++){
+      ctx.fillStyle=si%2===0?"rgba(0,0,0,0.055)":"rgba(255,255,255,0.025)";
+      var sy=FY+si*(FH/8),sh=FH/8;
+      ctx.beginPath();if(si===0)ctx.roundRect(FX,sy,FW,sh,{tl:12,tr:12,br:0,bl:0});
+      else if(si===7)ctx.roundRect(FX,sy,FW,sh,{tl:0,tr:0,br:12,bl:12});
+      else ctx.rect(FX,sy,FW,sh);
+      ctx.fill();
+    }
+
+    // Pitch lines
+    ctx.strokeStyle="rgba(255,255,255,0.28)";ctx.lineWidth=1.8;ctx.lineJoin="round";ctx.lineCap="round";
+    var PX1=FX+16,PY1=FY+12,PX2=FX+FW-16,PY2=FY+FH-12;
+    var PW=PX2-PX1,PH=PY2-PY1;
+    ctx.strokeRect(PX1,PY1,PW,PH);
+    // Halfway line
+    ctx.beginPath();ctx.moveTo(PX1,PY1+PH/2);ctx.lineTo(PX2,PY1+PH/2);ctx.stroke();
+    // Centre circle
+    ctx.beginPath();ctx.arc(FX+FW/2,PY1+PH/2,56,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,0.3)";ctx.beginPath();ctx.arc(FX+FW/2,PY1+PH/2,4,0,Math.PI*2);ctx.fill();
+    // Penalty areas
+    var paW=PW*0.54,paH=PH*0.16;
+    ctx.strokeRect(PX1+(PW-paW)/2,PY1,paW,paH);
+    ctx.strokeRect(PX1+(PW-paW)/2,PY2-paH,paW,paH);
+    var gaW=PW*0.28,gaH=PH*0.08;
+    ctx.strokeRect(PX1+(PW-gaW)/2,PY1,gaW,gaH);
+    ctx.strokeRect(PX1+(PW-gaW)/2,PY2-gaH,gaW,gaH);
+    // Penalty arcs
+    ctx.beginPath();ctx.arc(FX+FW/2,PY1+paH+32,36,0,Math.PI,false);ctx.stroke();
+    ctx.beginPath();ctx.arc(FX+FW/2,PY2-paH-32,36,Math.PI,0,false);ctx.stroke();
+    // Penalty spots
+    ctx.fillStyle="rgba(255,255,255,0.4)";
+    ctx.beginPath();ctx.arc(FX+FW/2,PY1+PH*0.115,4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(FX+FW/2,PY2-PH*0.115,4,0,Math.PI*2);ctx.fill();
+
+    // --- PLAYERS ---
     var base=FORMATIONS[form]?FORMATIONS[form].positions:[];
     var positions=base.map(function(p){return customPos[p.slot]?Object.assign({},p,{x:customPos[p.slot].x,y:customPos[p.slot].y}):p;});
-    positions.forEach(function(pos){var pl=lineup[pos.slot];if(!pl)return;
-      var px=55+(pos.x/100)*(W-110),py=FY+10+(pos.y/100)*(FH-20);
+    var KS=1.45; // kit scale factor
+    var KH=72*KS*0.5; // approx half kit height
+    positions.forEach(function(pos){
+      var pl=lineup[pos.slot];if(!pl)return;
+      var px=PX1+(pos.x/100)*PW;
+      var py=PY1+(pos.y/100)*PH;
       var col=POSITION_COLORS[pos.role]||"#6b7280";
-      var kc=color||col;var kr=parseInt(kc.slice(1,3),16)||80,kg=parseInt(kc.slice(3,5),16)||80,kb=parseInt(kc.slice(5,7),16)||80;
-      var klt="rgb("+Math.min(255,kr+35)+","+Math.min(255,kg+35)+","+Math.min(255,kb+35)+")";
-      var kdk="rgb("+Math.max(0,kr-25)+","+Math.max(0,kg-25)+","+Math.max(0,kb-25)+")";
-      var isGK=pos.role==="GK";var sc=isGK?"#d4a017":kc;var slt2=isGK?"#e6b422":klt;var sdk2=isGK?"#b8860b":kdk;
-      var kg3=ctx.createLinearGradient(px-18,py-26,px+18,py+18);kg3.addColorStop(0,slt2);kg3.addColorStop(1,sdk2);ctx.fillStyle=kg3;
-      ctx.beginPath();ctx.moveTo(px-16,py-20);ctx.quadraticCurveTo(px,py-28,px+16,py-20);ctx.lineTo(px+18,py+18);ctx.lineTo(px-18,py+18);ctx.closePath();ctx.fill();
-      ctx.fillStyle=sdk2;ctx.beginPath();ctx.moveTo(px-16,py-20);ctx.lineTo(px-26,py-12);ctx.lineTo(px-22,py-2);ctx.lineTo(px-16,py-10);ctx.closePath();ctx.fill();
-      ctx.beginPath();ctx.moveTo(px+16,py-20);ctx.lineTo(px+26,py-12);ctx.lineTo(px+22,py-2);ctx.lineTo(px+16,py-10);ctx.closePath();ctx.fill();
-      ctx.strokeStyle="rgba(255,255,255,0.25)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px-7,py-20);ctx.lineTo(px,py-15);ctx.lineTo(px+7,py-20);ctx.stroke();
-      var num2=(numbers)[pos.slot]||"";
-      if(num2){ctx.fillStyle="rgba(255,255,255,0.65)";ctx.font="bold 14px sans-serif";ctx.textAlign="center";ctx.fillText(num2,px,py+4);}
-      else{ctx.fillStyle="rgba(255,255,255,0.7)";ctx.font="800 14px sans-serif";ctx.textAlign="center";ctx.fillText(ini(pl.name),px,py+2);}
-      ctx.fillStyle=rcol(pl.rating);ctx.beginPath();ctx.roundRect(px+18,py-32,26,17,4);ctx.fill();ctx.fillStyle="#000";ctx.font="bold 12px sans-serif";ctx.fillText(""+pl.rating,px+31,py-20);
-      ctx.fillStyle="rgba(0,0,0,0.82)";ctx.beginPath();ctx.roundRect(px-46,py+20,92,38,5);ctx.fill();
-      ctx.fillStyle="#bbb";ctx.font="bold 8px sans-serif";ctx.fillText(pos.role,px,py+30);
-      ctx.fillStyle="#fff";ctx.font="bold 12px sans-serif";ctx.fillText(pl.shortName.length>11?pl.shortName.slice(0,10)+"..":pl.shortName,px,py+42);
-      ctx.fillStyle="#16a34a";ctx.font="bold 9px sans-serif";
-      var statLine="E"+pl.value+"M | E"+(pl.wage/1000).toFixed(1)+"M/a | "+pl.age+"a";
-      ctx.fillText(statLine,px,py+53);
+      var kc=color||col;
+      var isGK=pos.role==="GK";
+
+      // Shadow under kit
+      ctx.fillStyle="rgba(0,0,0,0.22)";
+      ctx.beginPath();ctx.ellipse(px,py+KH*0.7,22*KS,7,0,0,Math.PI*2);ctx.fill();
+
+      // Kit (same path logic as SVG, scaled)
+      drawKitCanvas(ctx,px,py,kc,isGK,KS);
+
+      // Number or initials on kit body
+      var num2=numbers[pos.slot]||"";
+      var textY=py+8*KS;
+      if(num2){
+        ctx.fillStyle="rgba(255,255,255,0.8)";ctx.font="900 "+(16*KS)+"px 'Arial Black',sans-serif";
+        ctx.textAlign="center";ctx.fillText(num2,px,textY);
+      }else{
+        ctx.fillStyle="rgba(255,255,255,0.75)";ctx.font="900 "+(13*KS)+"px 'Arial Black',sans-serif";
+        ctx.textAlign="center";ctx.fillText(ini(pl.name),px,textY);
+      }
+
+      // Rating badge (top-right of kit)
+      var rBx=px+20*KS,rBy=py-38*KS,rBw=28,rBh=18;
+      ctx.fillStyle=rcol(pl.rating);
+      ctx.beginPath();ctx.roundRect(rBx,rBy,rBw,rBh,5);ctx.fill();
+      // Shadow
+      ctx.fillStyle="rgba(0,0,0,0.4)";ctx.font="900 13px sans-serif";
+      ctx.textAlign="center";ctx.fillText(""+pl.rating,rBx+rBw/2+1,rBy+13);
+      ctx.fillStyle="#111";ctx.fillText(""+pl.rating,rBx+rBw/2,rBy+13);
+
+      // Name tag below kit
+      var tagW=100,tagH=42,tagX=px-tagW/2,tagY=py+KH*0.82;
+      // tag bg with kit color tint
+      ctx.fillStyle="rgba(6,10,20,0.88)";
+      ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,7);ctx.fill();
+      // left accent bar
+      ctx.fillStyle=isGK?"#d4a017":kc;
+      ctx.beginPath();ctx.roundRect(tagX,tagY,4,tagH,{tl:7,tr:0,br:0,bl:7});ctx.fill();
+      // role label
+      ctx.fillStyle=POSITION_COLORS[pos.role]||col;
+      ctx.font="800 9px sans-serif";ctx.textAlign="center";
+      ctx.fillText(pos.role,px+2,tagY+13);
+      // player name
+      ctx.fillStyle="#ffffff";ctx.font="700 13px sans-serif";
+      var sname=pl.shortName.length>12?pl.shortName.slice(0,11)+".":pl.shortName;
+      ctx.fillText(sname,px+2,tagY+27);
+      // stat line
+      ctx.fillStyle=isGK?"#e8b84b":"#22c55e";
+      ctx.font="600 9px sans-serif";
+      ctx.fillText("E"+pl.value+"M  "+pl.age+"a",px+2,tagY+39);
     });
+
+    // --- STATS BAR ---
     var filled=lineup.filter(Boolean);
-    if(filled.length){var SY=FY+FH+20;ctx.fillStyle="rgba(255,255,255,0.04)";ctx.beginPath();ctx.roundRect(40,SY,W-80,100,10);ctx.fill();ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(40,SY,W-80,100,10);ctx.stroke();
+    var SY=FY+FH+14;
+    var sbH=110;
+
+    // Stats bar bg
+    ctx.fillStyle="rgba(15,22,35,0.95)";
+    ctx.beginPath();ctx.roundRect(FX,SY,FW,sbH,12);ctx.fill();
+    // Stats bar border with gradient
+    var sbg=ctx.createLinearGradient(FX,0,FX+FW,0);
+    sbg.addColorStop(0,"transparent");sbg.addColorStop(0.2,kc0+"88");sbg.addColorStop(0.8,kc0+"88");sbg.addColorStop(1,"transparent");
+    ctx.strokeStyle=sbg;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(FX,SY,FW,sbH,12);ctx.stroke();
+
+    // universosportivo.com inside stats bar as watermark
+    ctx.textAlign="center";ctx.font="bold 11px sans-serif";
+    ctx.fillStyle="rgba(255,255,255,0.07)";
+    ctx.fillText("universosportivo.com",W/2,SY+sbH-8);
+
+    if(filled.length){
       var avgR=(filled.reduce(function(a,p){return a+p.rating;},0)/filled.length).toFixed(1);
       var avgA=(filled.reduce(function(a,p){return a+(p.age||0);},0)/filled.length).toFixed(1);
       var totV=filled.reduce(function(a,p){return a+(p.value||0);},0);
       var totW=(filled.reduce(function(a,p){return a+(p.wage||0);},0)/1000).toFixed(1);
-      var metrics=[{l:"OVR",v:avgR,c:rcol(parseFloat(avgR))},{l:"Valore",v:"E"+totV+"M",c:"#16a34a"},{l:"Stipendi/a",v:"E"+totW+"M",c:"#f59e0b"},{l:"Eta media",v:avgA+"a",c:"#3b82f6"},{l:"Giocatori",v:filled.length+"/11",c:"#9ca3af"}];
-      metrics.forEach(function(m,i2){var x=40+(W-80)/5*i2+(W-80)/10;ctx.fillStyle=m.c;ctx.font="bold 26px sans-serif";ctx.textAlign="center";ctx.fillText(m.v,x,SY+42);ctx.fillStyle="rgba(255,255,255,0.35)";ctx.font="11px sans-serif";ctx.fillText(m.l,x,SY+62);});}
-    ctx.fillStyle="rgba(255,255,255,0.15)";ctx.font="bold 13px sans-serif";ctx.textAlign="center";ctx.fillText("universosportivo.com",W/2,H-15);
+      var metrics=[
+        {l:"RATING",v:avgR,c:rcol(parseFloat(avgR)),sub:"medio"},
+        {l:"VALORE",v:"\u20AC"+totV+"M",c:"#22c55e",sub:"rosa"},
+        {l:"STIPENDI",v:"\u20AC"+totW+"M",c:"#f59e0b",sub:"per anno"},
+        {l:"ETÀ",v:avgA+"a",c:"#60a5fa",sub:"media"},
+        {l:"TITOLARI",v:filled.length+"/11",c:"#a78bfa",sub:"in campo"},
+      ];
+      metrics.forEach(function(m,i2){
+        var mx=FX+(FW/5)*i2+(FW/10);
+        // divider
+        if(i2>0){ctx.strokeStyle="rgba(255,255,255,0.08)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(FX+(FW/5)*i2,SY+15);ctx.lineTo(FX+(FW/5)*i2,SY+sbH-15);ctx.stroke();}
+        // value
+        ctx.fillStyle=m.c;ctx.font="900 26px 'Arial Black',sans-serif";ctx.textAlign="center";
+        ctx.fillText(m.v,mx,SY+50);
+        // label
+        ctx.fillStyle="rgba(255,255,255,0.55)";ctx.font="700 10px sans-serif";
+        ctx.fillText(m.l,mx,SY+68);
+        // sublabel
+        ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="400 9px sans-serif";
+        ctx.fillText(m.sub,mx,SY+82);
+      });
+    }
+
+    // --- FOOTER branding ---
+    var footY=SY+sbH+18;
+    ctx.textAlign="center";
+    // Logo mark
+    var lx=W/2-90,ly=footY;
+    ctx.fillStyle=kc0;
+    ctx.beginPath();ctx.roundRect(lx,ly,20,20,5);ctx.fill();
+    ctx.fillStyle="#fff";ctx.font="900 11px sans-serif";ctx.textAlign="center";
+    ctx.fillText("U",lx+10,ly+14);
+    // Site name
+    ctx.textAlign="left";
+    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.font="700 15px sans-serif";
+    ctx.fillText("universo",lx+26,ly+10);
+    ctx.fillStyle=kc0;ctx.font="700 15px sans-serif";
+    ctx.fillText("sportivo",lx+26+ctx.measureText("universo").width,ly+10);
+    ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="400 12px sans-serif";
+    ctx.fillText(".com",lx+26+ctx.measureText("universosportivo").width,ly+10);
+    ctx.fillStyle="rgba(255,255,255,0.25)";ctx.font="400 10px sans-serif";ctx.textAlign="center";
+    ctx.fillText("Lineup Builder \u2022 Crea e condividi la tua formazione",W/2+10,ly+10);
+    // Line above footer
+    ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(FX,footY-8);ctx.lineTo(FX+FW,footY-8);ctx.stroke();
+
     var a=document.createElement("a");a.download=(name||"lineup").replace(/\s/g,"-")+"-lineup.png";a.href=c.toDataURL("image/png");a.click();onDone();
   },[]);
   return <canvas ref={ref} style={{display:"none"}}/>;
 }
 
-function TeamPicker(props){var onSelect=props.onSelect,onClose=props.onClose;var th=useContext(ThCtx);var T=TH[th];return(
+function TeamPicker(props){var onSelect=props.onSelect,onClose=props.onClose;var th=useContext(ThCtx);var T=TH[th];
+  var _lg=useState("serie_a"),lg=_lg[0],setLg=_lg[1];
+  var cur=ALL_LEAGUES.find(function(l){return l.id===lg;})||ALL_LEAGUES[0];
+  return(
   <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(8px)"}}>
-    <div style={{background:T.pn,borderRadius:20,width:"100%",maxWidth:500,border:"1px solid "+T.bd,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.7)"}}>
-      <div style={{padding:"16px 20px",borderBottom:"1px solid "+T.bd,display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:T.pn,zIndex:1,borderRadius:"20px 20px 0 0"}}>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:T.tx}}>Carica squadra Serie A</div>
+    <div style={{background:T.pn,borderRadius:20,width:"100%",maxWidth:560,border:"1px solid "+T.bd,maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px rgba(0,0,0,0.7)"}}>
+      <div style={{padding:"14px 18px",borderBottom:"1px solid "+T.bd,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0,borderRadius:"20px 20px 0 0"}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:T.tx}}>Carica squadra</div>
         <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"1px solid "+T.bd,color:T.dm,cursor:"pointer",fontSize:16,width:32,height:32,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>x</button>
       </div>
-      <div style={{padding:14,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-        {SERIE_A_TEAMS.map(function(team){return(
+      <div style={{display:"flex",gap:0,borderBottom:"1px solid "+T.bd,overflowX:"auto",flexShrink:0}}>
+        {ALL_LEAGUES.map(function(l){var a=lg===l.id;return(
+          <button key={l.id} onClick={function(){setLg(l.id);}} style={{padding:"8px 12px",border:"none",borderBottom:a?"2px solid #16a34a":"2px solid transparent",background:"transparent",color:a?"#16a34a":T.dm,fontSize:11,fontWeight:a?800:600,cursor:"pointer",whiteSpace:"nowrap",transition:"all .12s"}}>{l.name+" ("+l.teams.length+")"}</button>);})}
+      </div>
+      <div style={{overflowY:"auto",flex:1,padding:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {cur.teams.map(function(team){return(
           <button key={team.name} onClick={function(){onSelect(team);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 8px",background:team.color+"12",border:"1px solid "+team.color+"44",borderRadius:12,cursor:"pointer",transition:"all .15s"}}>
             <KitSVG color={team.color} size={38}/>
             <div style={{fontSize:11,fontWeight:800,color:T.tx,textAlign:"center"}}>{team.name}</div>
             <div style={{fontSize:9,color:T.dm}}>{team.formation+" OVR "+team.rating}</div>
           </button>);})}
-      </div></div></div>);}
+        </div>
+      </div>
+    </div></div>);}
 
 function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,role=props.role,lineup=props.lineup,isAlt=props.isAlt,teamName=props.teamName;var th=useContext(ThCtx);var T=TH[th];
   var roleToF=function(r){if(!r)return"ALL";if(r==="GK")return"GK";if(["CB","RB","LB"].indexOf(r)>=0)return"DEF";if(["DM","CM","AM","RM","LM"].indexOf(r)>=0)return"MID";if(["ST","RW","LW"].indexOf(r)>=0)return"ATT";return"ALL";};
@@ -287,7 +516,7 @@ function Settings(props){var name=props.name,setName=props.setName,color=props.c
   var colors=["#16a34a","#2563eb","#dc2626","#d97706","#7c3aed","#db2777","#0891b2","#e5e7eb","#000","#8B2500","#8B0000","#003399"];
   var cats=Array.from(new Set(Object.values(FORMATIONS).map(function(f){return f.category;})));
   return(<div style={{background:T.pn,borderRadius:14,border:"1px solid "+T.bd,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
-    <button onClick={onPick} style={{width:"100%",padding:"11px 12px",background:"linear-gradient(135deg,rgba(22,163,74,0.18),rgba(22,163,74,0.08))",border:"none",borderBottom:"1px solid "+T.bd,color:"#16a34a",fontSize:12,fontWeight:800,cursor:"pointer",letterSpacing:"0.5px"}}>Carica squadra Serie A</button>
+    <button onClick={onPick} style={{width:"100%",padding:"11px 12px",background:"linear-gradient(135deg,rgba(22,163,74,0.18),rgba(22,163,74,0.08))",border:"none",borderBottom:"1px solid "+T.bd,color:"#16a34a",fontSize:12,fontWeight:800,cursor:"pointer",letterSpacing:"0.5px"}}>Carica squadra</button>
     <div style={{padding:"10px 12px",borderBottom:"1px solid "+T.bd}}><div style={{fontSize:9,fontWeight:700,color:T.dm,marginBottom:5,letterSpacing:"0.8px"}}>NOME SQUADRA</div>
       <input value={name} onChange={function(e){setName(e.target.value);}} maxLength={24} style={{width:"100%",background:T.ib,border:"1px solid "+T.bd,borderRadius:8,padding:"7px 10px",color:T.tx,fontSize:14,outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}/></div>
     <div style={{padding:"10px 12px",borderBottom:"1px solid "+T.bd}}><div style={{fontSize:9,fontWeight:700,color:T.dm,marginBottom:5,letterSpacing:"0.8px"}}>ALLENATORE</div>
@@ -549,6 +778,10 @@ export default function App(){
         {pending&&<ConfirmModal team={pending} onOk={function(){doLoad(pending);}} onNo={function(){setPending(null);}}/>}
         {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} coach={coach} customPos={customPos} numbers={numbers} stats={stats} onDone={function(){setExporting(false);setToast("PNG scaricato!");}}/>}
         {toast&&<Toast msg={toast} onDone={function(){setToast(null);}}/>}
+        <footer style={{textAlign:"center",padding:"18px 14px 22px",borderTop:"1px solid "+T.bd,marginTop:20}}>
+          <div style={{fontSize:10,color:T.ft,lineHeight:1.6}}>All EA FC assets are property of EA Sports.</div>
+          <div style={{fontSize:9,color:T.ft,marginTop:4}}>universosportivo.com</div>
+        </footer>
       </div>
     </ThCtx.Provider>);
 }
