@@ -18,37 +18,32 @@ function KitSVG(props){
   var color=props.color||"#16a34a",size=props.size||32,isGK=props.isGK||false;
   var th=useContext(ThCtx);var c=isGK?"#d4a017":color;
   var r=parseInt(c.slice(1,3),16)||80,g=parseInt(c.slice(3,5),16)||80,b=parseInt(c.slice(5,7),16)||80;
-  var lt="rgb("+Math.min(255,r+40)+","+Math.min(255,g+40)+","+Math.min(255,b+40)+")";
-  var dk="rgb("+Math.max(0,r-30)+","+Math.max(0,g-30)+","+Math.max(0,b-30)+")";
-  var sk=th==="dark"?"rgba(255,255,255,0.2)":"rgba(0,0,0,0.2)";
-  var uid="kg"+size+c.replace("#","");
+  var lt="rgb("+Math.min(255,r+50)+","+Math.min(255,g+50)+","+Math.min(255,b+50)+")";
+  var dk="rgb("+Math.max(0,r-35)+","+Math.max(0,g-35)+","+Math.max(0,b-35)+")";
+  var uid="kg"+size+c.replace("#","")+(isGK?"g":"");
   return(
-    <svg width={size} height={Math.round(size*1.2)} viewBox="0 0 60 72" style={{display:"block",flexShrink:0}}>
-      <defs><linearGradient id={uid} x1="0" y1="0" x2="0.3" y2="1"><stop offset="0%" stopColor={lt}/><stop offset="100%" stopColor={dk}/></linearGradient></defs>
-      <path d="M15,17 Q30,10 45,17 L48,70 L12,70 Z" fill={"url(#"+uid+")"}/>
-      <rect x="12" y="30" width="2.5" height="40" rx="1" fill="rgba(255,255,255,0.12)"/>
-      <rect x="45.5" y="30" width="2.5" height="40" rx="1" fill="rgba(255,255,255,0.12)"/>
-      <path d="M22,22 Q30,18 38,22 L36,35 Q30,37 24,35 Z" fill="rgba(255,255,255,0.06)"/>
-      <path d="M15,17 L3,26 L7,36 L15,30 Z" fill={dk}/><path d="M45,17 L57,26 L53,36 L45,30 Z" fill={dk}/>
-      <path d="M24,17 L30,22 L36,17" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M15,17 Q30,10 45,17 L48,70 L12,70 Z" fill="none" stroke={sk} strokeWidth="0.5"/>
-      <path d="M15,17 L3,26 L7,36 L15,30" fill="none" stroke={sk} strokeWidth="0.4"/>
-      <path d="M45,17 L57,26 L53,36 L45,30" fill="none" stroke={sk} strokeWidth="0.4"/>
+    <svg width={size} height={Math.round(size*1.15)} viewBox="0 0 60 69" style={{display:"block",flexShrink:0,filter:"drop-shadow(0 3px 6px rgba(0,0,0,0.5))"}}>
+      <defs><linearGradient id={uid} x1="0" y1="0" x2="0.25" y2="1"><stop offset="0%" stopColor={lt}/><stop offset="100%" stopColor={dk}/></linearGradient></defs>
+      <path d="M15,16 Q30,9 45,16 L47,68 L13,68 Z" fill={"url(#"+uid+")"}/>
+      <path d="M15,16 L2,25 L6,35 L15,28 Z" fill={dk}/><path d="M45,16 L58,25 L54,35 L45,28 Z" fill={dk}/>
+      <rect x="13" y="28" width="2" height="40" rx="1" fill="rgba(255,255,255,0.1)"/>
+      <rect x="45" y="28" width="2" height="40" rx="1" fill="rgba(255,255,255,0.1)"/>
+      <path d="M24,16 L30,21 L36,16" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" strokeLinecap="round"/>
+      <path d="M22,20 Q30,16 38,20 L36,32 Q30,34 24,32 Z" fill="rgba(255,255,255,0.04)"/>
     </svg>);
 }
 
-function StatBadges(props){var player=props.player,stats=props.stats;
+function StatBadges(props){var player=props.player,stats=props.stats,color=props.color;
   if(!player)return null;
   var items=STAT_VIEWS.filter(function(s){return stats.includes(s.id)&&s.id!=="rating"&&player[s.id]!==undefined;});
   if(!items.length)return null;
-  return(<div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"center",marginTop:2}}>
-    {items.slice(0,2).map(function(sv){var exp=sv.id==="contract"&&player.contract<=2026;var c2=exp?"#ef4444":sv.color;
+  return(<div style={{display:"flex",gap:3,justifyContent:"center",marginTop:2,flexWrap:"wrap"}}>
+    {items.slice(0,3).map(function(sv){var exp=sv.id==="contract"&&player.contract<=2026;var c2=exp?"#ef4444":sv.color;
       var l=sv.id==="nation"?(NATION_FLAGS[player.nation]||player.nation):sv.id==="foot"?(player.foot==="L"?"Sin":"Dx"):(""+sv.icon+" "+sv.format(player[sv.id]));
-      return <div key={sv.id} style={{background:c2+"22",border:"1px solid "+c2+"66",borderRadius:3,padding:"0 4px",fontSize:7,fontWeight:800,color:c2,whiteSpace:"nowrap",lineHeight:"13px"}}>{l}</div>;
+      return <div key={sv.id} style={{background:"rgba(0,0,0,0.7)",border:"1px solid "+c2+"55",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:c2,whiteSpace:"nowrap",lineHeight:"12px"}}>{l}</div>;
     })}</div>);
 }
 
-// Touch drag state (module-level)
 var td={on:false,player:null,fromSlot:null,ghost:null,dropCb:null};
 
 function PitchSlot(props){
@@ -61,52 +56,34 @@ function PitchSlot(props){
   var dv=function(e){e.preventDefault();};
   var dl=function(){cnt.current--;if(cnt.current<=0){cnt.current=0;setOver(false);}};
   var dd=function(e){e.preventDefault();cnt.current=0;setOver(false);try{onDrop(slot,JSON.parse(e.dataTransfer.getData("text/plain")));}catch(ex){}};
-  // Touch drag
-  var tStart=function(e){if(!player)return;var t=e.touches[0];
-    timerRef.current=setTimeout(function(){
-      td.on=true;td.player=player;td.fromSlot=slot;td.dropCb=onDrop;
-      var g=document.createElement("div");g.id="tg";
-      g.style.cssText="position:fixed;pointer-events:none;z-index:9999;width:46px;height:46px;border-radius:50%;background:"+b+"55;border:3px solid "+b+";display:flex;align-items:center;justify-content:center;font:800 13px sans-serif;color:#fff;transform:translate(-50%,-65%);box-shadow:0 4px 16px "+b+"99;left:"+t.clientX+"px;top:"+t.clientY+"px;";
-      g.textContent=ini(player.name);document.body.appendChild(g);td.ghost=g;
-      if(navigator.vibrate)navigator.vibrate(30);
-    },250);};
-  var tMove=function(e){if(!td.on){clearTimeout(timerRef.current);return;}e.preventDefault();var t=e.touches[0];
-    if(td.ghost){td.ghost.style.left=t.clientX+"px";td.ghost.style.top=t.clientY+"px";}};
-  var tEnd=function(e){clearTimeout(timerRef.current);if(!td.on)return;
-    if(td.ghost){td.ghost.remove();td.ghost=null;}
-    var t=e.changedTouches[0];var el=document.elementFromPoint(t.clientX,t.clientY);
-    var slotEl=el?el.closest("[data-slot]"):null;
-    if(slotEl){td.dropCb(parseInt(slotEl.dataset.slot),{id:td.player.id,slot:td.fromSlot});}
-    else{var pitch=el?el.closest("[data-pitch]"):null;
-      if(pitch){var r2=pitch.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((t.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((t.clientY-r2.top)/r2.height)*100));
-        pitch.dispatchEvent(new CustomEvent("touchdrop",{detail:{slot:td.fromSlot,x:xP,y:yP}}));}}
-    td.on=false;td.player=null;td.fromSlot=null;};
+  var tStart=function(e){if(!player)return;var t=e.touches[0];timerRef.current=setTimeout(function(){td.on=true;td.player=player;td.fromSlot=slot;td.dropCb=onDrop;var g=document.createElement("div");g.id="tg";g.style.cssText="position:fixed;pointer-events:none;z-index:9999;width:50px;height:50px;border-radius:50%;background:"+b+"55;border:3px solid "+b+";display:flex;align-items:center;justify-content:center;font:800 14px sans-serif;color:#fff;transform:translate(-50%,-65%);box-shadow:0 4px 20px "+b+"99;left:"+t.clientX+"px;top:"+t.clientY+"px;";g.textContent=ini(player.name);document.body.appendChild(g);td.ghost=g;if(navigator.vibrate)navigator.vibrate(30);},250);};
+  var tMove=function(e){if(!td.on){clearTimeout(timerRef.current);return;}e.preventDefault();var t=e.touches[0];if(td.ghost){td.ghost.style.left=t.clientX+"px";td.ghost.style.top=t.clientY+"px";}};
+  var tEnd=function(e){clearTimeout(timerRef.current);if(!td.on)return;if(td.ghost){td.ghost.remove();td.ghost=null;}var t=e.changedTouches[0];var el=document.elementFromPoint(t.clientX,t.clientY);var slotEl=el?el.closest("[data-slot]"):null;if(slotEl){td.dropCb(parseInt(slotEl.dataset.slot),{id:td.player.id,slot:td.fromSlot});}else{var pitch=el?el.closest("[data-pitch]"):null;if(pitch){var r2=pitch.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((t.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((t.clientY-r2.top)/r2.height)*100));pitch.dispatchEvent(new CustomEvent("touchdrop",{detail:{slot:td.fromSlot,x:xP,y:yP}}));}}td.on=false;td.player=null;td.fromSlot=null;};
   var tCancel=function(){clearTimeout(timerRef.current);if(td.ghost){td.ghost.remove();td.ghost=null;}td.on=false;};
   var num=numbers[slot]||"";
   var zoneLabel="";if(pos.y<35&&["GK","CB","RB","LB"].indexOf(pos.role)<0)zoneLabel=" ATT";if(pos.y>65&&["GK","CB","RB","LB","ST","RW","LW"].indexOf(pos.role)<0)zoneLabel=" DIF";
-  var S={position:"absolute",left:pos.x+"%",top:pos.y+"%",transform:"translate(-50%,-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2,zIndex:over?20:10};
+  var S={position:"absolute",left:pos.x+"%",top:pos.y+"%",transform:"translate(-50%,-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:1,zIndex:over?20:10};
   if(!player)return(
     <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
-      <div onClick={function(){onClick(slot);}} style={{width:46,height:46,borderRadius:"50%",border:"2px dashed "+c,backgroundColor:over?c+"44":c+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:c+"cc",cursor:"pointer",transform:over?"scale(1.2)":"scale(1)",transition:"all .15s",boxShadow:over?"0 0 16px "+c+"66":"none"}}>+</div>
-      <div style={{background:T.lb,borderRadius:4,padding:"1px 6px",fontSize:9,color:c,fontWeight:700,boxShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{pos.role+zoneLabel}</div>
+      <div onClick={function(){onClick(slot);}} style={{width:44,height:44,borderRadius:"50%",border:"2px dashed "+c+"88",backgroundColor:over?c+"33":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:c+"aa",cursor:"pointer",transform:over?"scale(1.15)":"scale(1)",transition:"all .2s",boxShadow:over?"0 0 20px "+c+"55":"none"}}>+</div>
+      <div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:"1px 7px",fontSize:8,color:c,fontWeight:700}}>{pos.role}</div>
     </div>);
+  var accent=tColor||c;
   return(
     <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
       <div draggable onDragStart={ds} onTouchStart={tStart} onTouchMove={tMove} onTouchEnd={tEnd} onTouchCancel={tCancel}
-        onClick={function(){onClick(slot);}} style={{position:"relative",cursor:"grab",transform:over?"scale(1.18)":"scale(1)",transition:"transform .15s",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",touchAction:"none"}}>
-        {kits?<KitSVG color={tColor||c} size={42} isGK={pos.role==="GK"}/>
-          :<div style={{width:46,height:46,borderRadius:"50%",backgroundColor:c+"22",border:"3px solid "+b,boxShadow:"0 0 14px "+b+"66,0 2px 8px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{ini(player.name)}</div>}
-        {stats.includes("rating")&&<div style={{position:"absolute",top:-5,right:-5,background:rcol(player.rating),color:"#000",fontSize:8,fontWeight:800,borderRadius:4,padding:"0 3px",lineHeight:"14px",minWidth:14,textAlign:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{player.rating}</div>}
-        {stats.includes("age")&&<div style={{position:"absolute",top:-5,left:-5,background:"#3b82f6",color:"#fff",fontSize:7,fontWeight:800,borderRadius:3,padding:"0 2px",lineHeight:"13px",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{player.age}</div>}
-        {stats.includes("foot")&&<div style={{position:"absolute",bottom:-2,left:-2,background:player.foot==="L"?"#ec4899":"#6b7280",color:"#fff",fontSize:6,fontWeight:800,borderRadius:2,padding:"0 2px",lineHeight:"11px"}}>{player.foot==="L"?"L":"R"}</div>}
-        {num&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",fontSize:9,fontWeight:900,color:"rgba(255,255,255,0.75)",textShadow:"0 1px 3px rgba(0,0,0,0.8)"}}>{num}</div>}
+        onClick={function(){onClick(slot);}} style={{position:"relative",cursor:"grab",transform:over?"scale(1.12)":"scale(1)",transition:"transform .15s",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",touchAction:"none"}}>
+        {kits?<KitSVG color={accent} size={44} isGK={pos.role==="GK"}/>
+          :<div style={{width:46,height:46,borderRadius:"50%",background:"linear-gradient(135deg,"+accent+"cc,"+accent+"88)",border:"2px solid rgba(255,255,255,0.25)",boxShadow:"0 0 18px "+accent+"55,0 4px 12px rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff",fontFamily:"'Barlow Condensed',sans-serif",textShadow:"0 1px 3px rgba(0,0,0,0.5)"}}>{ini(player.name)}</div>}
+        {stats.includes("rating")&&<div style={{position:"absolute",top:-6,right:-8,background:rcol(player.rating),color:"#000",fontSize:9,fontWeight:900,borderRadius:5,padding:"0 4px",lineHeight:"16px",minWidth:18,textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.6)",border:"1px solid rgba(255,255,255,0.2)"}}>{player.rating}</div>}
+        {num&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",fontSize:10,fontWeight:900,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{num}</div>}
       </div>
-      <div style={{background:"rgba(8,10,20,0.92)",borderRadius:6,padding:"3px 8px",maxWidth:90,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.7)",border:"1px solid rgba(255,255,255,0.08)"}} onClick={function(){onClick(slot);}}>
-        <div style={{fontSize:7,color:"#9ca3af",fontWeight:800,letterSpacing:"0.5px"}}>{pos.role+zoneLabel}</div>
-        <div style={{fontSize:11,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}>{cap===player.id?"C ":""}{player.shortName}</div>
-        {alt&&<div style={{fontSize:8,color:"#16a34a",fontWeight:600,borderTop:"1px solid rgba(22,163,74,0.3)",marginTop:1,paddingTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{alt.shortName}</div>}
+      <div style={{background:"rgba(4,6,14,0.94)",borderRadius:7,padding:"3px 9px",maxWidth:92,textAlign:"center",boxShadow:"0 3px 12px rgba(0,0,0,0.8)",borderLeft:"3px solid "+accent,borderRight:"none",borderTop:"1px solid rgba(255,255,255,0.06)",borderBottom:"1px solid rgba(255,255,255,0.03)"}} onClick={function(){onClick(slot);}}>
+        <div style={{fontSize:7,color:c,fontWeight:800,letterSpacing:"0.8px",textTransform:"uppercase"}}>{pos.role+zoneLabel}</div>
+        <div style={{fontSize:11,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"15px"}}>{cap===player.id?"\u00A9 ":""}{player.shortName}</div>
+        {alt&&<div style={{fontSize:8,color:"#34d399",fontWeight:600,borderTop:"1px solid rgba(52,211,153,0.2)",marginTop:1,paddingTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{alt.shortName}</div>}
       </div>
-      <StatBadges player={player} stats={stats}/>
+      <StatBadges player={player} stats={stats} color={accent}/>
     </div>);
 }
 
@@ -116,45 +93,44 @@ function PitchView(props){
   var base=FORMATIONS[form]?FORMATIONS[form].positions:[];
   var positions=base.map(function(p){return customPos[p.slot]?Object.assign({},p,{x:customPos[p.slot].x,y:customPos[p.slot].y}):p;});
   var pitchRef=useRef();
-  useEffect(function(){var el=pitchRef.current;if(!el)return;
-    var handler=function(e){if(onPitchDrop)onPitchDrop(e.detail.slot,e.detail.x,e.detail.y);};
-    el.addEventListener("touchdrop",handler);return function(){el.removeEventListener("touchdrop",handler);};},[onPitchDrop]);
+  useEffect(function(){var el=pitchRef.current;if(!el)return;var handler=function(e){if(onPitchDrop)onPitchDrop(e.detail.slot,e.detail.x,e.detail.y);};el.addEventListener("touchdrop",handler);return function(){el.removeEventListener("touchdrop",handler);};},[onPitchDrop]);
+  var ac=color||"#16a34a";
   return(
-    <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none",borderRadius:12,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}
+    <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none",borderRadius:14,overflow:"hidden",border:"2px solid "+ac+"44",boxShadow:"0 0 40px "+ac+"15,0 10px 40px rgba(0,0,0,0.6)"}}
       onDragOver={function(e){e.preventDefault();}}
-      onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;
-        try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;
-          var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));
-          if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
+      onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
       <svg viewBox="0 0 300 450" style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
         <defs>
-          <linearGradient id="gf" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor={T.pD}/><stop offset="100%" stopColor={T.pL}/></linearGradient>
-          <filter id="ps"><feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="rgba(0,0,0,0.4)"/></filter>
+          <linearGradient id="gf" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#0c1a0c"/><stop offset="50%" stopColor="#0f2810"/><stop offset="100%" stopColor="#0a1f0c"/></linearGradient>
+          <linearGradient id="gf2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(255,255,255,0.04)"/><stop offset="50%" stopColor="rgba(255,255,255,0)"/><stop offset="100%" stopColor="rgba(255,255,255,0.02)"/></linearGradient>
+          <radialGradient id="spotG" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="rgba(255,255,255,0.06)"/><stop offset="100%" stopColor="rgba(255,255,255,0)"/></radialGradient>
         </defs>
-        <rect width="300" height="450" fill="url(#gf)" rx="10"/>
-        {[0,1,2,3,4,5,6,7].map(function(i){return <rect key={i} x="0" y={i*57} width="300" height="28" fill={i%2===0?"rgba(0,0,0,0.07)":"rgba(255,255,255,0.025)"}/>;
+        <rect width="300" height="450" fill="url(#gf)"/>
+        <rect width="300" height="450" fill="url(#gf2)"/>
+        {[0,1,2,3,4,5,6,7,8,9].map(function(i){return <rect key={i} x="0" y={i*45} width="300" height="22.5" fill={i%2===0?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.03)"}/>;
         })}
-        <g fill="none" stroke={T.ln} strokeWidth="1.4">
-          <rect x="12" y="12" width="276" height="426" rx="3"/>
-          <line x1="12" y1="225" x2="288" y2="225"/>
-          <circle cx="150" cy="225" r="36"/>
-          <rect x="58" y="352" width="184" height="78"/>
-          <rect x="102" y="392" width="96" height="38"/>
-          <rect x="58" y="20" width="184" height="78"/>
-          <rect x="102" y="20" width="96" height="38"/>
-          <path d="M 102 122 A 36 36 0 0 0 198 122"/>
-          <path d="M 102 328 A 36 36 0 0 1 198 328"/>
-          <circle cx="150" cy="225" r="3" fill={T.ln}/>
-          <circle cx="150" cy="101" r="3" fill={T.ln}/>
-          <circle cx="150" cy="349" r="3" fill={T.ln}/>
+        <ellipse cx="150" cy="225" rx="120" ry="100" fill="url(#spotG)"/>
+        <g fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1">
+          <rect x="10" y="10" width="280" height="430" rx="2"/>
+          <line x1="10" y1="225" x2="290" y2="225"/>
+          <circle cx="150" cy="225" r="38"/>
+          <rect x="60" y="354" width="180" height="76"/><rect x="105" y="395" width="90" height="35"/>
+          <rect x="60" y="20" width="180" height="76"/><rect x="105" y="20" width="90" height="35"/>
+          <path d="M 105 120 A 38 38 0 0 0 195 120"/><path d="M 105 330 A 38 38 0 0 1 195 330"/>
         </g>
-        {name&&<text x="150" y="226" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.035)" fontSize="18" fontWeight="900" letterSpacing="4">{name.toUpperCase()}</text>}
-        <text x="150" y="14" textAnchor="middle" fill="rgba(255,255,255,0.06)" fontSize="28" fontWeight="900" letterSpacing="8">LINEUP BUILDER</text>
-        <text x="150" y="444" textAnchor="middle" fill="rgba(255,255,255,0.06)" fontSize="28" fontWeight="900" letterSpacing="8">LINEUP BUILDER</text>
-        <text x="6" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.045)" fontSize="11" fontWeight="900" letterSpacing="6" transform="rotate(-90,6,225)">UNIVERSOSPORTIVO.COM</text>
-        <text x="294" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.045)" fontSize="11" fontWeight="900" letterSpacing="6" transform="rotate(90,294,225)">UNIVERSOSPORTIVO.COM</text>
+        <g fill="rgba(255,255,255,0.12)"><circle cx="150" cy="225" r="2.5"/><circle cx="150" cy="100" r="2"/><circle cx="150" cy="350" r="2"/>
+          <circle cx="13" cy="13" r="1.5"/><circle cx="287" cy="13" r="1.5"/><circle cx="13" cy="437" r="1.5"/><circle cx="287" cy="437" r="1.5"/>
+          <path d="M10,18 A 5 5 0 0 1 15,13" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/><path d="M285,13 A 5 5 0 0 1 290,18" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
+          <path d="M10,432 A 5 5 0 0 0 15,437" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/><path d="M285,437 A 5 5 0 0 0 290,432" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
+        </g>
+        {name&&<text x="150" y="226" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.025)" fontSize="22" fontWeight="900" letterSpacing="6" fontFamily="sans-serif">{name.toUpperCase()}</text>}
+        <text x="150" y="8" textAnchor="middle" fill="rgba(255,255,255,0.05)" fontSize="22" fontWeight="900" letterSpacing="10" fontFamily="sans-serif">LINEUP BUILDER</text>
+        <text x="150" y="448" textAnchor="middle" fill="rgba(255,255,255,0.05)" fontSize="22" fontWeight="900" letterSpacing="10" fontFamily="sans-serif">LINEUP BUILDER</text>
+        <text x="5" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.035)" fontSize="9" fontWeight="900" letterSpacing="5" transform="rotate(-90,5,225)">UNIVERSOSPORTIVO.COM</text>
+        <text x="295" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.035)" fontSize="9" fontWeight="900" letterSpacing="5" transform="rotate(90,295,225)">UNIVERSOSPORTIVO.COM</text>
       </svg>
-      {coach&&<div style={{position:"absolute",top:8,right:10,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(6px)",borderRadius:6,padding:"3px 9px",fontSize:10,color:"#fff",fontWeight:700,border:"1px solid rgba(255,255,255,0.1)"}}>{coach}</div>}
+      {coach&&<div style={{position:"absolute",top:6,right:8,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",borderRadius:6,padding:"3px 10px",fontSize:10,color:"#fff",fontWeight:700,border:"1px solid rgba(255,255,255,0.08)"}}>{coach}</div>}
+      <div style={{position:"absolute",top:6,left:8,background:"rgba(0,0,0,0.6)",borderRadius:6,padding:"3px 10px",fontSize:9,color:"rgba(255,255,255,0.5)",fontWeight:700,border:"1px solid rgba(255,255,255,0.06)"}}>{form}</div>
       {positions.map(function(p){return(
         <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
           alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
