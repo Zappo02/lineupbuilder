@@ -1,5 +1,5 @@
 import React,{useState,useRef,useEffect,useCallback,createContext,useContext} from"react";
-import{PLAYERS,FORMATIONS,POSITION_COLORS,STAT_VIEWS,NATION_FLAGS,TEAM_COLORS,ALL_LEAGUES}from"./data/players.js";
+import{PLAYERS,FORMATIONS,POSITION_COLORS,STAT_VIEWS,NATION_FLAGS,TEAM_COLORS,ALL_LEAGUES,LEAGUE_MAP}from"./data/players.js";
 
 var ThCtx=createContext("dark");
 var TH={
@@ -458,15 +458,18 @@ function TeamPicker(props){var onSelect=props.onSelect,onClose=props.onClose;var
 function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,role=props.role,lineup=props.lineup,isAlt=props.isAlt,teamName=props.teamName;var th=useContext(ThCtx);var T=TH[th];
   var roleToF=function(r){if(!r)return"ALL";if(r==="GK")return"GK";if(["CB","RB","LB"].indexOf(r)>=0)return"DEF";if(["DM","CM","AM","RM","LM"].indexOf(r)>=0)return"MID";if(["ST","RW","LW"].indexOf(r)>=0)return"ATT";return"ALL";};
   var _q=useState(""),q=_q[0],setQ=_q[1];var _p=useState(function(){return roleToF(role);}),pf=_p[0],setPf=_p[1];var _c=useState("ALL"),cf=_c[0],setCf=_c[1];
+  var _lf=useState("ALL"),leagueF=_lf[0],setLeagueF=_lf[1];
   var _r=useState(60),minR=_r[0],setMinR=_r[1];var _a1=useState(16),minA=_a1[0],setMinA=_a1[1];var _a2=useState(40),maxA=_a2[0],setMaxA=_a2[1];
   var _w1=useState(0),minW=_w1[0],setMinW=_w1[1];var _w2=useState(15),maxW=_w2[0],setMaxW=_w2[1];var _v1=useState(0),minV=_v1[0],setMinV=_v1[1];var _v2=useState(200),maxV=_v2[0],setMaxV=_v2[1];
   var _f=useState("ALL"),footF=_f[0],setFootF=_f[1];var _co=useState("ALL"),conF=_co[0],setConF=_co[1];var _ad=useState(false),adv=_ad[0],setAdv=_ad[1];
   var ref2=useRef();useEffect(function(){var t=setTimeout(function(){if(ref2.current)ref2.current.focus();},400);return function(){clearTimeout(t);};},[]);
   var PM={DEF:["CB","RB","LB"],MID:["DM","CM","AM","RM","LM"],ATT:["ST","RW","LW"]};
-  var clubs=["ALL"].concat(Array.from(new Set(PLAYERS.map(function(p){return p.club;}))));
+  var leagueNames=["ALL"].concat(ALL_LEAGUES.map(function(l){return l.name;}));
+  var clubs=["ALL"].concat(Array.from(new Set(PLAYERS.filter(function(p){return leagueF==="ALL"||(LEAGUE_MAP[p.club]||"")=== leagueF;}).map(function(p){return p.club;}))).sort());
   var used=new Set(lineup.filter(Boolean).map(function(p){return p.id;}));
   var list=PLAYERS.filter(function(p){
     if(!isAlt&&used.has(p.id))return false;if(q&&!norm(p.name).includes(norm(q))&&!norm(p.club).includes(norm(q)))return false;
+    if(leagueF!=="ALL"&&(LEAGUE_MAP[p.club]||"")!==leagueF)return false;
     if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]&&PM[pf].indexOf(p.position)>=0))return false;
     if(cf!=="ALL"&&p.club!==cf)return false;if(p.rating<minR)return false;if(minA>16&&p.age<minA)return false;if(maxA<40&&p.age>maxA)return false;
     var wM=p.wage/1000;if(minW>0&&wM<minW)return false;if(maxW<15&&wM>maxW)return false;if(minV>0&&p.value<minV)return false;if(maxV<200&&p.value>maxV)return false;
@@ -485,6 +488,8 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
             {["ALL","GK","DEF","MID","ATT"].map(function(g){return pill(pf===g,function(){setPf(g);},g);})}
             {teamName&&teamName!=="La mia Squadra"&&pill(cf===teamName,function(){setCf(cf===teamName?"ALL":teamName);},teamName,"#d97706")}
             <button onClick={function(){setAdv(!adv);}} style={{marginLeft:"auto",padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:adv?"rgba(99,102,241,0.2)":"transparent",borderColor:adv?"#6366f1":"rgba(128,128,128,0.25)",color:adv?"#6366f1":T.dm}}>{"Filtri "+(adv?"^":"v")}</button></div>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6,overflowX:"auto"}}>
+            {leagueNames.map(function(ln){var a=leagueF===ln;var lb=ln==="ALL"?"Tutti":ln;return pill(a,function(){setLeagueF(ln);if(ln!=="ALL")setCf("ALL");},lb,"#8b5cf6");})}</div>
           {adv&&<div style={{background:T.ib,borderRadius:10,padding:"10px 12px",display:"flex",flexDirection:"column",gap:8,border:"1px solid "+T.bd}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80}}>Squadra</span>
               <select value={cf} onChange={function(e){setCf(e.target.value);}} style={{flex:1,background:T.ib,border:"1px solid "+T.bd,borderRadius:6,padding:"4px 8px",color:T.dm,fontSize:11,outline:"none"}}>{clubs.map(function(c2){return <option key={c2} value={c2}>{c2==="ALL"?"Tutte":c2}</option>;})}</select></div>
