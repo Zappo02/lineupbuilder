@@ -142,7 +142,7 @@ function PitchView(props){
             <rect x="128" y="462" width="84" height="16" rx="2" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
           </g>
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
-          <text x="170" y="472" textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="10" fontWeight="800" letterSpacing="3">UNIVERSOSPORTIVO.COM</text>
+          <text x="170" y="455" textAnchor="middle" fill="rgba(255,255,255,0.15)" fontSize="8" fontWeight="800" letterSpacing="2">UNIVERSOSPORTIVO.COM</text>
           <text x="14" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(-90,14,236)">LINEUP BUILDER</text>
           <text x="326" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(90,326,236)">LINEUP BUILDER</text>
         </svg>
