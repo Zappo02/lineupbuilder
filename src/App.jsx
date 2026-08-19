@@ -62,7 +62,7 @@ function PitchSlot(props){
   var tCancel=function(){clearTimeout(timerRef.current);if(td.ghost){td.ghost.remove();td.ghost=null;}td.on=false;};
   var num=numbers[slot]||"";
   var zoneLabel="";if(pos.y<35&&["GK","CB","RB","LB"].indexOf(pos.role)<0)zoneLabel=" ATT";if(pos.y>65&&["GK","CB","RB","LB","ST","RW","LW"].indexOf(pos.role)<0)zoneLabel=" DIF";
-  var S={position:"absolute",left:pos.x+"%",top:pos.y+"%",transform:"translate(-50%,-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:1,zIndex:over?20:10};
+  var S={position:"absolute",left:pos.x+"%",top:pos.y+"%",transform:"translate(-50%,-50%) rotateX(-12deg)",display:"flex",flexDirection:"column",alignItems:"center",gap:1,zIndex:over?20:10,transformStyle:"preserve-3d"};
   if(!player)return(
     <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
       <div onClick={function(){onClick(slot);}} style={{width:44,height:44,borderRadius:"50%",border:"2px dashed "+c+"88",backgroundColor:over?c+"33":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:c+"aa",cursor:"pointer",transform:over?"scale(1.15)":"scale(1)",transition:"all .2s",boxShadow:over?"0 0 20px "+c+"55":"none"}}>+</div>
@@ -95,46 +95,66 @@ function PitchView(props){
   var pitchRef=useRef();
   useEffect(function(){var el=pitchRef.current;if(!el)return;var handler=function(e){if(onPitchDrop)onPitchDrop(e.detail.slot,e.detail.x,e.detail.y);};el.addEventListener("touchdrop",handler);return function(){el.removeEventListener("touchdrop",handler);};},[onPitchDrop]);
   var ac=color||"#16a34a";
+  // 3D perspective wrapper
   return(
-    <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"150%",userSelect:"none",WebkitUserSelect:"none",borderRadius:14,overflow:"hidden",border:"2px solid "+ac+"44",boxShadow:"0 0 40px "+ac+"15,0 10px 40px rgba(0,0,0,0.6)"}}
-      onDragOver={function(e){e.preventDefault();}}
-      onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
-      <svg viewBox="0 0 300 450" style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
-        <defs>
-          <linearGradient id="gf" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#0c1a0c"/><stop offset="50%" stopColor="#0f2810"/><stop offset="100%" stopColor="#0a1f0c"/></linearGradient>
-          <linearGradient id="gf2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(255,255,255,0.04)"/><stop offset="50%" stopColor="rgba(255,255,255,0)"/><stop offset="100%" stopColor="rgba(255,255,255,0.02)"/></linearGradient>
-          <radialGradient id="spotG" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="rgba(255,255,255,0.06)"/><stop offset="100%" stopColor="rgba(255,255,255,0)"/></radialGradient>
-        </defs>
-        <rect width="300" height="450" fill="url(#gf)"/>
-        <rect width="300" height="450" fill="url(#gf2)"/>
-        {[0,1,2,3,4,5,6,7,8,9].map(function(i){return <rect key={i} x="0" y={i*45} width="300" height="22.5" fill={i%2===0?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.03)"}/>;
-        })}
-        <ellipse cx="150" cy="225" rx="120" ry="100" fill="url(#spotG)"/>
-        <g fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1">
-          <rect x="10" y="10" width="280" height="430" rx="2"/>
-          <line x1="10" y1="225" x2="290" y2="225"/>
-          <circle cx="150" cy="225" r="38"/>
-          <rect x="60" y="354" width="180" height="76"/><rect x="105" y="395" width="90" height="35"/>
-          <rect x="60" y="20" width="180" height="76"/><rect x="105" y="20" width="90" height="35"/>
-          <path d="M 105 120 A 38 38 0 0 0 195 120"/><path d="M 105 330 A 38 38 0 0 1 195 330"/>
-        </g>
-        <g fill="rgba(255,255,255,0.12)"><circle cx="150" cy="225" r="2.5"/><circle cx="150" cy="100" r="2"/><circle cx="150" cy="350" r="2"/>
-          <circle cx="13" cy="13" r="1.5"/><circle cx="287" cy="13" r="1.5"/><circle cx="13" cy="437" r="1.5"/><circle cx="287" cy="437" r="1.5"/>
-          <path d="M10,18 A 5 5 0 0 1 15,13" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/><path d="M285,13 A 5 5 0 0 1 290,18" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-          <path d="M10,432 A 5 5 0 0 0 15,437" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/><path d="M285,437 A 5 5 0 0 0 290,432" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-        </g>
-        {name&&<text x="150" y="226" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.025)" fontSize="22" fontWeight="900" letterSpacing="6" fontFamily="sans-serif">{name.toUpperCase()}</text>}
-        <text x="150" y="8" textAnchor="middle" fill="rgba(255,255,255,0.05)" fontSize="22" fontWeight="900" letterSpacing="10" fontFamily="sans-serif">LINEUP BUILDER</text>
-        <text x="150" y="448" textAnchor="middle" fill="rgba(255,255,255,0.05)" fontSize="22" fontWeight="900" letterSpacing="10" fontFamily="sans-serif">LINEUP BUILDER</text>
-        <text x="5" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.035)" fontSize="9" fontWeight="900" letterSpacing="5" transform="rotate(-90,5,225)">UNIVERSOSPORTIVO.COM</text>
-        <text x="295" y="225" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.035)" fontSize="9" fontWeight="900" letterSpacing="5" transform="rotate(90,295,225)">UNIVERSOSPORTIVO.COM</text>
-      </svg>
-      {coach&&<div style={{position:"absolute",top:6,right:8,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",borderRadius:6,padding:"3px 10px",fontSize:10,color:"#fff",fontWeight:700,border:"1px solid rgba(255,255,255,0.08)"}}>{coach}</div>}
-      <div style={{position:"absolute",top:6,left:8,background:"rgba(0,0,0,0.6)",borderRadius:6,padding:"3px 10px",fontSize:9,color:"rgba(255,255,255,0.5)",fontWeight:700,border:"1px solid rgba(255,255,255,0.06)"}}>{form}</div>
-      {positions.map(function(p){return(
-        <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
-          alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
-          onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap} numbers={numbers}/>);})}
+    <div style={{perspective:"900px",perspectiveOrigin:"50% 25%",width:"100%"}}>
+      {coach&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
+      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:10,overflow:"visible",transform:"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
+        onDragOver={function(e){e.preventDefault();}}
+        onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
+        <svg viewBox="0 0 340 480" preserveAspectRatio="xMidYMid slice" style={{position:"absolute",inset:0,width:"100%",height:"100%",borderRadius:10}}>
+          <defs>
+            <linearGradient id="pitch3d" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#1a6b2a"/><stop offset="40%" stopColor="#1e8035"/><stop offset="100%" stopColor="#145523"/></linearGradient>
+            <linearGradient id="sideL" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#0d3a14"/><stop offset="100%" stopColor="#1a6b2a"/></linearGradient>
+            <linearGradient id="sideB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#145523"/><stop offset="100%" stopColor="#0a2e10"/></linearGradient>
+          </defs>
+          <rect width="340" height="480" fill="#0a2e10" rx="10"/>
+          <rect x="10" y="8" width="320" height="454" fill="url(#pitch3d)" rx="4"/>
+          {[0,1,2,3,4,5,6,7,8,9,10,11,12].map(function(i){return <rect key={i} x="10" y={8+i*35} width="320" height="17.5" fill={i%2===0?"rgba(255,255,255,0.03)":"rgba(0,0,0,0.04)"} rx="0"/>;
+          })}
+          <rect x="0" y="462" width="340" height="18" fill="url(#sideB)" rx="0 0 10 10"/>
+          <rect x="0" y="0" width="10" height="480" fill="url(#sideL)" rx="10 0 0 10"/>
+          <rect x="330" y="0" width="10" height="480" fill="url(#sideL)" rx="0 10 10 0" transform="scale(-1,1) translate(-340,0)"/>
+          <g fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinejoin="round">
+            <rect x="20" y="16" width="300" height="440" rx="1"/>
+            <line x1="20" y1="236" x2="320" y2="236"/>
+            <circle cx="170" cy="236" r="42"/>
+            <circle cx="170" cy="236" r="2.5" fill="rgba(255,255,255,0.5)"/>
+            <rect x="70" y="16" width="200" height="82"/>
+            <rect x="115" y="16" width="110" height="38"/>
+            <path d="M 115 122 A 42 42 0 0 0 225 122"/>
+            <circle cx="170" cy="102" r="2" fill="rgba(255,255,255,0.4)"/>
+            <rect x="70" y="374" width="200" height="82"/>
+            <rect x="115" y="418" width="110" height="38"/>
+            <path d="M 115 350 A 42 42 0 0 1 225 350"/>
+            <circle cx="170" cy="370" r="2" fill="rgba(255,255,255,0.4)"/>
+            <path d="M20,20 A 4 4 0 0 1 24,16" /><path d="M316,16 A 4 4 0 0 1 320,20"/>
+            <path d="M20,452 A 4 4 0 0 0 24,456"/><path d="M316,456 A 4 4 0 0 0 320,452"/>
+          </g>
+          <g fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5">
+            <line x1="130" y1="8" x2="130" y2="0"/><line x1="210" y1="8" x2="210" y2="0"/>
+            <line x1="130" y1="0" x2="210" y2="0"/>
+            <rect x="128" y="-4" width="84" height="12" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
+          </g>
+          <g fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2">
+            <line x1="130" y1="462" x2="130" y2="474"/><line x1="210" y1="462" x2="210" y2="474"/>
+            <line x1="130" y1="474" x2="210" y2="474"/>
+            <rect x="128" y="462" width="84" height="16" rx="2" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
+          </g>
+          {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
+          <text x="170" y="472" textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="10" fontWeight="800" letterSpacing="3">UNIVERSOSPORTIVO.COM</text>
+          <text x="14" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(-90,14,236)">LINEUP BUILDER</text>
+          <text x="326" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(90,326,236)">LINEUP BUILDER</text>
+        </svg>
+        <div style={{position:"absolute",top:6,left:12,background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 8px",fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,zIndex:5}}>{form}</div>
+        {positions.map(function(p){return(
+          <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
+            alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
+            onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap} numbers={numbers}/>);})}
+      </div>
+      <div style={{textAlign:"center",marginTop:8}}>
+        <span style={{fontSize:9,color:T.ft,letterSpacing:"1.5px",fontWeight:700}}>UNIVERSOSPORTIVO.COM</span>
+      </div>
     </div>);
 }
 
@@ -871,7 +891,8 @@ export default function App(){
         {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} coach={coach} customPos={customPos} numbers={numbers} stats={stats} onDone={function(){setExporting(false);setToast("PNG scaricato!");}}/>}
         {toast&&<Toast msg={toast} onDone={function(){setToast(null);}}/>}
         <footer style={{textAlign:"center",padding:"18px 14px 22px",borderTop:"1px solid "+T.bd,marginTop:20}}>
-          <div style={{fontSize:10,color:T.ft,lineHeight:1.6}}>All EA FC assets are property of EA Sports.</div>
+          <div style={{fontSize:10,color:T.ft,lineHeight:1.8}}>I valori, i rating e le informazioni dei giocatori provengono da EA FC 26 (modalita Carriera) e potrebbero non essere aggiornati.</div>
+          <div style={{fontSize:9,color:T.ft,marginTop:4}}>All EA FC assets are property of EA Sports.</div>
           <div style={{fontSize:9,color:T.ft,marginTop:4}}>universosportivo.com</div>
         </footer>
       </div>
