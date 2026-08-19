@@ -142,7 +142,7 @@ function PitchView(props){
             <rect x="128" y="462" width="84" height="16" rx="2" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
           </g>
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
-          <text x="170" y="455" textAnchor="middle" fill="rgba(255,255,255,0.15)" fontSize="8" fontWeight="800" letterSpacing="2">UNIVERSOSPORTIVO.COM</text>
+          <text x="170" y="455" textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="8" fontWeight="800" letterSpacing="2">LINEUP BUILDER</text>
           <text x="14" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(-90,14,236)">LINEUP BUILDER</text>
           <text x="326" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(90,326,236)">LINEUP BUILDER</text>
         </svg>
@@ -402,27 +402,25 @@ function ExportCanvas(props){
     }
 
     // --- FOOTER branding ---
-    var footY=SY+sbH+18;
+    var footY=Math.min(SY+sbH+18, H-30);
     ctx.textAlign="center";
-    // Logo mark
-    var lx=W/2-90,ly=footY;
-    ctx.fillStyle=kc0;
-    ctx.beginPath();ctx.roundRect(lx,ly,20,20,5);ctx.fill();
-    ctx.fillStyle="#fff";ctx.font="900 11px sans-serif";ctx.textAlign="center";
-    ctx.fillText("U",lx+10,ly+14);
-    // Site name
-    ctx.textAlign="left";
-    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.font="700 15px sans-serif";
-    ctx.fillText("universo",lx+26,ly+10);
-    ctx.fillStyle=kc0;ctx.font="700 15px sans-serif";
-    ctx.fillText("sportivo",lx+26+ctx.measureText("universo").width,ly+10);
-    ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="400 12px sans-serif";
-    ctx.fillText(".com",lx+26+ctx.measureText("universosportivo").width,ly+10);
-    ctx.fillStyle="rgba(255,255,255,0.25)";ctx.font="400 10px sans-serif";ctx.textAlign="center";
-    ctx.fillText("Lineup Builder \u2022 Crea e condividi la tua formazione",W/2+10,ly+10);
-    // Line above footer
-    ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;
+    ctx.fillStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(FX,footY-8);ctx.lineTo(FX+FW,footY-8);ctx.stroke();
+    // Logo mark
+    var lx=W/2-80,ly=footY;
+    ctx.fillStyle=kc0;
+    ctx.beginPath();ctx.roundRect(lx,ly,18,18,4);ctx.fill();
+    ctx.fillStyle="#fff";ctx.font="900 10px sans-serif";ctx.textAlign="center";
+    ctx.fillText("U",lx+9,ly+13);
+    ctx.textAlign="left";
+    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.font="700 14px sans-serif";
+    ctx.fillText("universo",lx+24,ly+9);
+    ctx.fillStyle=kc0;
+    ctx.fillText("sportivo",lx+24+ctx.measureText("universo").width,ly+9);
+    ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="400 11px sans-serif";
+    ctx.fillText(".com",lx+24+ctx.measureText("universosportivo").width,ly+9);
+    ctx.fillStyle="rgba(255,255,255,0.2)";ctx.font="400 9px sans-serif";ctx.textAlign="center";
+    ctx.fillText("Lineup Builder",W/2,ly+22);
 
     var a=document.createElement("a");a.download=(name||"lineup").replace(/\s/g,"-")+"-lineup.png";a.href=c.toDataURL("image/png");a.click();onDone();
   },[]);
