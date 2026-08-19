@@ -97,7 +97,7 @@ function PitchView(props){
   var ac=color||"#16a34a";
   // 3D perspective wrapper
   return(
-    <div style={{perspective:"900px",perspectiveOrigin:"50% 25%",width:"100%"}}>
+    <div style={{perspective:"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:12}}>
       {coach&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
       <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:10,overflow:"visible",transform:"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
         onDragOver={function(e){e.preventDefault();}}
@@ -152,8 +152,8 @@ function PitchView(props){
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
             onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap} numbers={numbers}/>);})}
       </div>
-      <div style={{textAlign:"center",marginTop:8}}>
-        <span style={{fontSize:9,color:T.ft,letterSpacing:"1.5px",fontWeight:700}}>UNIVERSOSPORTIVO.COM</span>
+      <div style={{textAlign:"center",marginTop:10,padding:"6px 0"}}>
+        <span style={{fontSize:11,color:T.dm,letterSpacing:"1.5px",fontWeight:800}}>UNIVERSOSPORTIVO.COM</span>
       </div>
     </div>);
 }
@@ -768,6 +768,7 @@ export default function App(){
   var _ap2=useState(false),addingPlayer=_ap2[0],setAddingPlayer=_ap2[1];
   var _ep=useState(null),editingPlayer=_ep[0],setEditingPlayer=_ep[1];
   var _cp3=useState([]),customPlayers=_cp3[0],setCustomPlayers=_cp3[1];
+  var _disc=useState(function(){return !localStorage.getItem("lb_disc_ok");}),showDisclaimer=_disc[0],setShowDisclaimer=_disc[1];
   var past=useRef([]);var future=useRef([]);
   var allPlayers=PLAYERS.concat(customPlayers);
   var setLU=function(updater){setLineup(function(prev){past.current=past.current.concat([prev]).slice(-20);future.current=[];return typeof updater==="function"?updater(prev):updater;});};
@@ -829,29 +830,31 @@ export default function App(){
     <ThCtx.Provider value={theme}>
       <div style={{minHeight:"100vh",background:T.bg,color:T.tx,fontFamily:"'Inter',sans-serif"}}>
         <style>{"*{box-sizing:border-box;}html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}input[type=range]{accent-color:#ffd700;}button:active{opacity:0.8;transform:scale(0.97);}@media(max-width:900px){.mob-hide{display:none!important;}.mob-full{grid-column:1/-1!important;}}"}</style>
-        <header style={{background:T.hd,backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.bd,padding:"0 14px",height:54,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 24px rgba(0,0,0,0.35)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
-            <div style={{width:30,height:30,background:"linear-gradient(135deg,#16a34a,#059669)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,boxShadow:"0 0 12px rgba(22,163,74,0.5)"}}>
-              <span role="img" aria-label="ball">&#x26BD;</span>
+        <header style={{background:T.hd,backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.bd,padding:"6px 10px",position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 24px rgba(0,0,0,0.35)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+              <div style={{width:26,height:26,background:"linear-gradient(135deg,#16a34a,#059669)",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,boxShadow:"0 0 10px rgba(22,163,74,0.5)"}}>
+                <span role="img" aria-label="ball">&#x26BD;</span>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:900,lineHeight:1,color:T.tx}}>LINEUP BUILDER</div>
+                <div style={{fontSize:7,color:T.dm,letterSpacing:"1.5px"}}>UNIVERSOSPORTIVO.COM</div>
+              </div>
             </div>
-            <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:900,lineHeight:1,color:T.tx,letterSpacing:"0.5px"}}>LINEUP BUILDER</div>
-              <div style={{fontSize:8,color:T.dm,letterSpacing:"2px"}}>UNIVERSO SPORTIVO</div>
+            <div style={{display:"flex",background:T.ib,borderRadius:7,border:"1px solid "+T.bd,overflow:"hidden",flexShrink:0}}>
+              <button onClick={function(){setMode("single");}} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,background:mode==="single"?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:mode==="single"?"#fff":T.dm}}>Builder</button>
+              <button onClick={function(){setMode("compare");}} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,background:isCompare?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:isCompare?"#fff":T.dm}}>VS</button>
             </div>
           </div>
-          <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
-            <div style={{display:"flex",background:T.ib,borderRadius:8,border:"1px solid "+T.bd,overflow:"hidden",flexShrink:0}}>
-              <button onClick={function(){setMode("single");}} style={{padding:"6px 11px",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:mode==="single"?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:mode==="single"?"#fff":T.dm,transition:"all .15s"}}>Builder</button>
-              <button onClick={function(){setMode("compare");}} style={{padding:"6px 11px",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:isCompare?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:isCompare?"#fff":T.dm,transition:"all .15s"}}>VS</button>
-            </div>
-            <button onClick={function(){setTheme(theme==="dark"?"light":"dark");}} title="Tema" style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14}}>{theme==="dark"?"\u2600\uFE0F":"\uD83C\uDF19"}</button>
-            <button onClick={undo} title="Annulla" style={{background:T.ib,border:"1px solid "+T.bd,color:canUndo?T.tx:T.ft,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14,opacity:canUndo?1:0.45}}>{"\u21A9"}</button>
-            <button onClick={redo} title="Ripeti" style={{background:T.ib,border:"1px solid "+T.bd,color:canRedo?T.tx:T.ft,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14,opacity:canRedo?1:0.45}}>{"\u21AA"}</button>
-            <button onClick={autoFillFn} title="Auto-fill" style={{background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.4)",color:"#818cf8",borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14}}>{"\uD83E\uDD16"}</button>
-            <button onClick={function(){setExporting(true);}} title="Esporta PNG" style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14}}>{"\uD83D\uDCF8"}</button>
-            <button onClick={save} title="Salva" style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14}}>{"\uD83D\uDCBE"}</button>
-            <button onClick={function(){setShowSaved(!showSaved);}} title="Carica" style={{background:showSaved?"rgba(22,163,74,0.15)":T.ib,border:"1px solid "+(showSaved?"#16a34a":T.bd),color:showSaved?"#16a34a":T.tx,borderRadius:7,padding:"6px 9px",cursor:"pointer",fontSize:14}}>{"\uD83D\uDCC1"+(saved.length>0?" ("+saved.length+")":"")}</button>
-            <button onClick={share} title="Condividi link" style={{background:"linear-gradient(135deg,#16a34a,#059669)",border:"none",color:"#fff",borderRadius:7,padding:"6px 10px",cursor:"pointer",fontSize:14,fontWeight:700,boxShadow:"0 2px 8px rgba(22,163,74,0.4)"}}>{"\uD83D\uDD17"}</button>
+          <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+            <button onClick={function(){setTheme(theme==="dark"?"light":"dark");}} style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>{theme==="dark"?"\u2600\uFE0F":"\uD83C\uDF19"}</button>
+            <button onClick={undo} style={{background:T.ib,border:"1px solid "+T.bd,color:canUndo?T.tx:T.ft,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12,opacity:canUndo?1:0.4}}>{"\u21A9"}</button>
+            <button onClick={redo} style={{background:T.ib,border:"1px solid "+T.bd,color:canRedo?T.tx:T.ft,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12,opacity:canRedo?1:0.4}}>{"\u21AA"}</button>
+            <button onClick={autoFillFn} style={{background:"rgba(99,102,241,0.12)",border:"1px solid rgba(99,102,241,0.35)",color:"#818cf8",borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>{"\uD83E\uDD16"}</button>
+            <button onClick={function(){setExporting(true);}} style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>{"\uD83D\uDCF8"}</button>
+            <button onClick={save} style={{background:T.ib,border:"1px solid "+T.bd,color:T.tx,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>{"\uD83D\uDCBE"}</button>
+            <button onClick={function(){setShowSaved(!showSaved);}} style={{background:showSaved?"rgba(22,163,74,0.15)":T.ib,border:"1px solid "+(showSaved?"#16a34a":T.bd),color:showSaved?"#16a34a":T.tx,borderRadius:6,padding:"5px 8px",cursor:"pointer",fontSize:12}}>{"\uD83D\uDCC1"+(saved.length>0?" "+saved.length:"")}</button>
+            <button onClick={share} style={{background:"linear-gradient(135deg,#16a34a,#059669)",border:"none",color:"#fff",borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>{"\uD83D\uDD17"}</button>
           </div>
         </header>
         {showSaved&&<div style={{background:T.pn,borderBottom:"1px solid "+T.bd,padding:"10px 14px"}}>
@@ -890,6 +893,16 @@ export default function App(){
           setEditingPlayer(null);setToast("Modifiche salvate!");}}/>}
         {exporting&&<ExportCanvas lineup={lineup} form={form} name={name} color={color} coach={coach} customPos={customPos} numbers={numbers} stats={stats} onDone={function(){setExporting(false);setToast("PNG scaricato!");}}/>}
         {toast&&<Toast msg={toast} onDone={function(){setToast(null);}}/>}
+        {showDisclaimer&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(10px)"}}>
+          <div style={{background:T.pn,borderRadius:20,width:"100%",maxWidth:440,border:"1px solid "+T.bd,padding:"28px 24px",textAlign:"center",boxShadow:"0 24px 64px rgba(0,0,0,0.7)"}}>
+            <div style={{width:48,height:48,background:"linear-gradient(135deg,#16a34a,#059669)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,margin:"0 auto 14px",boxShadow:"0 0 20px rgba(22,163,74,0.5)"}}><span role="img" aria-label="ball">&#x26BD;</span></div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:900,color:T.tx,marginBottom:4}}>LINEUP BUILDER</div>
+            <div style={{fontSize:11,color:"#16a34a",fontWeight:700,letterSpacing:"1.5px",marginBottom:16}}>UNIVERSOSPORTIVO.COM</div>
+            <div style={{fontSize:13,color:T.dm,lineHeight:1.7,marginBottom:8,textAlign:"left"}}>I valori, i rating e tutte le informazioni dei giocatori provengono da <span style={{color:T.tx,fontWeight:700}}>EA FC 26</span> (modalita Carriera) e potrebbero non essere aggiornati o contenere imprecisioni.</div>
+            <div style={{fontSize:13,color:T.dm,lineHeight:1.7,marginBottom:8,textAlign:"left"}}>Puoi <span style={{color:"#818cf8",fontWeight:700}}>aggiungere giocatori</span> non presenti nel database e <span style={{color:"#818cf8",fontWeight:700}}>modificare</span> rating, valore, stipendio e tutti i parametri di ogni giocatore in campo.</div>
+            <div style={{fontSize:10,color:T.ft,marginBottom:20,textAlign:"left"}}>All EA FC assets are property of EA Sports.</div>
+            <button onClick={function(){localStorage.setItem("lb_disc_ok","1");setShowDisclaimer(false);}} style={{width:"100%",padding:"13px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:15,fontWeight:700,boxShadow:"0 4px 16px rgba(22,163,74,0.4)"}}>Ho capito</button>
+          </div></div>}
         <footer style={{textAlign:"center",padding:"18px 14px 22px",borderTop:"1px solid "+T.bd,marginTop:20}}>
           <div style={{fontSize:10,color:T.ft,lineHeight:1.8}}>I valori, i rating e le informazioni dei giocatori provengono da EA FC 26 (modalita Carriera) e potrebbero non essere aggiornati.</div>
           <div style={{fontSize:9,color:T.ft,marginTop:4}}>All EA FC assets are property of EA Sports.</div>
