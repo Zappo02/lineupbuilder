@@ -160,26 +160,6 @@ function PitchView(props){
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
             onDrop={onDrop} onClick={onClick} tColor={color} stats={stats} kits={kits} cap={cap} numbers={numbers} small={small}/>);})}
       </div>
-      <div style={{marginTop:8}}>
-        {(function(){var f=lineup.filter(Boolean);if(!f.length)return null;
-          var avgR=(f.reduce(function(a,p){return a+p.rating;},0)/f.length).toFixed(1);
-          var avgA=(f.reduce(function(a,p){return a+p.age;},0)/f.length).toFixed(1);
-          var totV=Math.round(f.reduce(function(a,p){return a+p.value;},0)*10)/10;
-          var totW=Math.round(f.reduce(function(a,p){return a+p.wage;},0)/100)/10;
-          var items=[
-            {l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},
-            {l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},
-            {l:"XI",v:f.length+"/11",c:"#f472b6"}];
-          return <div style={{display:"flex",justifyContent:"center",gap:12,flexWrap:"wrap"}}>
-            {items.map(function(m){return <div key={m.l} style={{textAlign:"center"}}>
-              <div style={{fontSize:15,fontWeight:900,color:m.c,textShadow:"0 0 12px "+m.c+"66"}}>{m.v}</div>
-              <div style={{fontSize:7,fontWeight:700,color:T.ft,letterSpacing:"0.5px"}}>{m.l}</div></div>;})}</div>;})()}
-      </div>
-      {!isCompare&&<div style={{display:"flex",gap:6,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
-        <button onClick={function(){setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});setNumbers({});}} style={{padding:"6px 14px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.22)",color:"#f87171",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>Svuota</button>
-        <button onClick={function(){setAddingPlayer(true);}} style={{padding:"6px 14px",background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",color:"#818cf8",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>+ Giocatore</button>
-        <button onClick={function(){setMode("compare");}} style={{padding:"6px 14px",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.22)",color:"#f59e0b",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>VS Confronta</button>
-      </div>}
     </div>);
 }
 
@@ -977,7 +957,24 @@ export default function App(){
               <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={handleDrop2} onClick={function(slot){var pos2=(FORMATIONS[form2]?FORMATIONS[form2].positions:[]).find(function(p){return p.slot===slot;});setPicking({slot:slot,role:pos2?pos2.role:null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={function(){}} coach={coach2} numbers={{}} small={true}/>
             </div>
           </React.Fragment>:<React.Fragment>
-            <div><PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/></div>
+            <div>
+              <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/>
+              {(function(){var f=lineup.filter(Boolean);if(!f.length)return null;
+                var avgR=(f.reduce(function(a,p){return a+p.rating;},0)/f.length).toFixed(1);
+                var avgA=(f.reduce(function(a,p){return a+p.age;},0)/f.length).toFixed(1);
+                var totV=Math.round(f.reduce(function(a,p){return a+p.value;},0)*10)/10;
+                var totW=Math.round(f.reduce(function(a,p){return a+p.wage;},0)/100)/10;
+                var items=[{l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},{l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},{l:"XI",v:f.length+"/11",c:"#f472b6"}];
+                return <div style={{display:"flex",justifyContent:"center",gap:12,flexWrap:"wrap",marginTop:10}}>
+                  {items.map(function(m){return <div key={m.l} style={{textAlign:"center"}}>
+                    <div style={{fontSize:15,fontWeight:900,color:m.c,textShadow:"0 0 12px "+m.c+"66"}}>{m.v}</div>
+                    <div style={{fontSize:7,fontWeight:700,color:T.ft,letterSpacing:"0.5px"}}>{m.l}</div></div>;})}</div>;})()}
+              <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
+                <button onClick={function(){setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});setNumbers({});}} style={{padding:"6px 14px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.22)",color:"#f87171",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>Svuota</button>
+                <button onClick={function(){setAddingPlayer(true);}} style={{padding:"6px 14px",background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",color:"#818cf8",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>+ Giocatore</button>
+                <button onClick={function(){setMode("compare");}} style={{padding:"6px 14px",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.22)",color:"#f59e0b",borderRadius:7,cursor:"pointer",fontSize:10,fontWeight:700}}>VS Confronta</button>
+              </div>
+            </div>
             {col3}
             {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
           </React.Fragment>}
