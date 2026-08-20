@@ -101,9 +101,9 @@ function PitchView(props){
   var ac=color||"#16a34a";
   // 3D perspective wrapper
   return(
-    <div style={{perspective:"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:12}}>
+    <div style={{perspective:small?"600px":"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:small?4:12}}>
       {coach&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
-      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:10,overflow:"visible",transform:"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
+      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?8:10,overflow:"visible",transform:small?"rotateX(6deg)":"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
         onDragOver={function(e){e.preventDefault();}}
         onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
         <svg viewBox="0 0 340 480" preserveAspectRatio="xMidYMid slice" style={{position:"absolute",inset:0,width:"100%",height:"100%",borderRadius:10}}>
@@ -149,12 +149,12 @@ function PitchView(props){
         </svg>
         <div style={{position:"absolute",top:4,left:6,zIndex:15}}>
           <div style={{background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(255,255,255,0.12)",marginBottom:2}}>
-            <span style={{fontSize:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
-          <div style={{background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 8px",display:"inline-block"}}>
-            <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.55)"}}>{form}</span></div></div>
-        <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:small?6:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
+          {!small&&<div style={{background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 8px",display:"inline-block"}}>
+            <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.55)"}}>{form}</span></div>}</div>
+        {!small&&<div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:4}}>
           <div style={{width:11,height:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:6,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>UNIVERSO SPORTIVO</span></div>
+          <span style={{fontSize:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>UNIVERSO SPORTIVO</span></div>}
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
@@ -964,7 +964,8 @@ export default function App(){
                 var avgA=(f.reduce(function(a,p){return a+p.age;},0)/f.length).toFixed(1);
                 var totV=Math.round(f.reduce(function(a,p){return a+p.value;},0)*10)/10;
                 var totW=Math.round(f.reduce(function(a,p){return a+p.wage;},0)/100)/10;
-                var items=[{l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},{l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},{l:"XI",v:f.length+"/11",c:"#f472b6"}];
+                var lft=f.filter(function(p){return p.foot==="L";}).length;
+                var items=[{l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},{l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},{l:"Piede",v:(f.length-lft)+"D "+lft+"S",c:"#f472b6"}];
                 return <div style={{display:"flex",justifyContent:"center",gap:12,flexWrap:"wrap",marginTop:10}}>
                   {items.map(function(m){return <div key={m.l} style={{textAlign:"center"}}>
                     <div style={{fontSize:15,fontWeight:900,color:m.c,textShadow:"0 0 12px "+m.c+"66"}}>{m.v}</div>
