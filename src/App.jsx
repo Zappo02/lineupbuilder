@@ -721,7 +721,7 @@ function EditPlayerModal(props){
 }
 
 function PlayerDetailModal(props){
-  var player=props.player,slot=props.slot,pos=props.pos,onClose=props.onClose,onRemove=props.onRemove,onReplace=props.onReplace,onEdit=props.onEdit,cap=props.cap,onSetCap=props.onSetCap;
+  var player=props.player,slot=props.slot,pos=props.pos,onClose=props.onClose,onRemove=props.onRemove,onReplace=props.onReplace,onEdit=props.onEdit,onAddAlt=props.onAddAlt,cap=props.cap,onSetCap=props.onSetCap;
   var th=useContext(ThCtx);var T=TH[th];
   var c=POSITION_COLORS[player.position]||"#6b7280";
   var tc=TEAM_COLORS[player.club]||"#555";
@@ -761,6 +761,7 @@ function PlayerDetailModal(props){
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={function(){onReplace(slot);onClose();}} style={{flex:1,padding:"9px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>Sostituisci</button>
+            <button onClick={function(){onAddAlt(slot);onClose();}} style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid #16a34a",background:"rgba(22,163,74,0.1)",color:"#16a34a",cursor:"pointer",fontSize:12,fontWeight:700}}>Riserva</button>
             <button onClick={function(){onRemove(slot);onClose();}} style={{flex:1,padding:"9px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.08)",color:"#f87171",cursor:"pointer",fontSize:12,fontWeight:700}}>Rimuovi</button>
           </div>
         </div>
@@ -831,14 +832,26 @@ export default function App(){
       positions.forEach(function(pos){if(next[pos.slot])return;var p=sorted.find(function(p2){return!used.has(p2.id);});if(p){next[pos.slot]=p;used.add(p.id);}});return next;});setToast("Auto-fill!");};
   var doLoad=useCallback(function(team){
     var tf=team.formation||"4-3-3";var positions=FORMATIONS[tf]?FORMATIONS[tf].positions:[];var newLU=Array(11).fill(null);var used=new Set();
-    var starters=(team.starters||[]).map(function(s){return{xlRole:s.xlRole,p:s.playerId?PLAYERS.find(function(x){return x.id===s.playerId;}):null};}).filter(function(s){return s.p;});
+    var starters=(team.starters||[]).map(function(s){return{xlRole:s.xlRole,p:s.playerId?allPlayers.find(function(x){return x.id===s.playerId;}):null};}).filter(function(s){return s.p;});
     positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=starters.find(function(s){return XLR[s.xlRole]===pos.role&&!used.has(s.p.id);})||starters.find(function(s){return s.p.position===pos.role&&!used.has(s.p.id);});if(cc){newLU[pos.slot]=cc.p;used.add(cc.p.id);}});
-    var roster=PLAYERS.filter(function(p){return p.club===team.name;}).sort(function(a,b){return b.rating-a.rating;});
+    var roster=allPlayers.filter(function(p){return p.club===team.name;}).sort(function(a,b){return b.rating-a.rating;});
     positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=roster.find(function(p){return p.position===pos.role&&!used.has(p.id);});if(cc){newLU[pos.slot]=cc;used.add(cc.id);}});
     positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=roster.find(function(p){return!used.has(p.id);});if(cc){newLU[pos.slot]=cc;used.add(cc.id);}});
-    setLineup(newLU);setFormRaw(tf);setName(team.name);setColor(team.color);setAlts({});setBench(PLAYERS.filter(function(p){return p.club===team.name;}));setCustomPos({});setTeamPicker(false);setPending(null);setNumbers({});setToast(team.name+" caricata!");
-  },[]);
-  var loadTeam=function(team){if(lineup.some(Boolean)){setPending(team);setTeamPicker(false);}else doLoad(team);};
+    setLineup(newLU);setFormRaw(tf);setName(team.name);setColor(team.color);setAlts({});setBench(allPlayers.filter(function(p){return p.club===team.name;}));setCustomPos({});setTeamPicker(false);setPending(null);setNumbers({});setToast(team.name+" caricata!");
+  },[allPlayers]);
+  var doLoad2=function(team){
+    var tf=team.formation||"4-3-3";var positions=FORMATIONS[tf]?FORMATIONS[tf].positions:[];var newLU=Array(11).fill(null);var used=new Set();
+    var starters=(team.starters||[]).map(function(s){return{xlRole:s.xlRole,p:s.playerId?allPlayers.find(function(x){return x.id===s.playerId;}):null};}).filter(function(s){return s.p;});
+    positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=starters.find(function(s){return XLR[s.xlRole]===pos.role&&!used.has(s.p.id);})||starters.find(function(s){return s.p.position===pos.role&&!used.has(s.p.id);});if(cc){newLU[pos.slot]=cc.p;used.add(cc.p.id);}});
+    var roster=allPlayers.filter(function(p){return p.club===team.name;}).sort(function(a,b){return b.rating-a.rating;});
+    positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=roster.find(function(p){return p.position===pos.role&&!used.has(p.id);});if(cc){newLU[pos.slot]=cc;used.add(cc.id);}});
+    positions.forEach(function(pos){if(newLU[pos.slot])return;var cc=roster.find(function(p){return!used.has(p.id);});if(cc){newLU[pos.slot]=cc;used.add(cc.id);}});
+    setLineup2(newLU);setForm2Raw(tf);setName2(team.name);setColor2(team.color);setTeamPicker(false);setToast(team.name+" caricata (B)!");
+  };
+  var loadTeam=function(team){
+    var forTeam=(teamPicker&&teamPicker.team===2)?2:1;
+    if(forTeam===2){doLoad2(team);return;}
+    if(lineup.some(Boolean)){setPending(team);setTeamPicker(false);}else doLoad(team);};
   var slotClick=function(slot){var pos=(FORMATIONS[form]?FORMATIONS[form].positions:[]).find(function(p){return p.slot===slot;});
     if(lineup[slot]){setPlayerDetail({player:lineup[slot],slot:slot,role:pos?pos.role:null});return;}
     if(altMode&&lineup[slot])setPicking({slot:slot,role:pos?pos.role:null,isAlt:true});else setPicking({slot:slot,role:pos?pos.role:null,isAlt:false});};
@@ -894,7 +907,7 @@ export default function App(){
             </div>
             <div style={{display:"flex",background:T.ib,borderRadius:7,border:"1px solid "+T.bd,overflow:"hidden",flexShrink:0}}>
               <button onClick={function(){setMode("single");}} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,background:mode==="single"?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:mode==="single"?"#fff":T.dm}}>Builder</button>
-              <button onClick={function(){setMode("compare");}} style={{padding:"5px 10px",border:"none",cursor:"pointer",fontSize:10,fontWeight:700,background:isCompare?"linear-gradient(135deg,#16a34a,#059669)":"transparent",color:isCompare?"#fff":T.dm}}>VS</button>
+              <button onClick={function(){setMode("compare");}} style={{padding:"5px 12px",border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:isCompare?"linear-gradient(135deg,#f59e0b,#d97706)":"transparent",color:isCompare?"#fff":T.dm}}>VS Confronta</button>
             </div>
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
@@ -913,24 +926,36 @@ export default function App(){
           :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{saved.map(function(e){return(
             <div key={e.id} onClick={function(){load(e);}} style={{background:T.ib,border:"1px solid "+e.color+"55",borderRadius:10,padding:"7px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>
               <div style={{width:9,height:9,borderRadius:"50%",background:e.color,boxShadow:"0 0 6px "+e.color}}/><div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>{e.name}</div><div style={{fontSize:9,color:T.dm}}>{e.formation+" "+e.date}</div></div></div>);})}</div>}</div>}
-        <main style={{maxWidth:1280,margin:"0 auto",padding:"14px 10px",display:"grid",gridTemplateColumns:mobile?"1fr":isCompare?"180px 1fr 1fr 200px":"210px 1fr 210px 190px",gap:12,alignItems:"start"}}>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <main style={{maxWidth:1280,margin:"0 auto",padding:"14px 10px",display:"grid",gridTemplateColumns:mobile?(isCompare?"1fr 1fr":"1fr"):(isCompare?"1fr 1fr":"210px 1fr 210px 190px"),gap:isCompare?8:12,alignItems:"start"}}>
+          {!isCompare&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
             <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={function(){setTeamPicker(true);}} alt={altMode} setAlt={setAltMode} coach={coach} setCoach={setCoach}/>
             <StatSel stats={stats} setStats={setStats}/>
             <div style={{background:T.pn,borderRadius:12,border:"1px solid "+T.bd,padding:"9px 12px",boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
               <button onClick={function(){setLU(Array(11).fill(null));setAlts({});setBench([]);setCustomPos({});setNumbers({});}} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.22)",color:"#f87171",borderRadius:7,padding:"7px",cursor:"pointer",fontSize:11,fontWeight:700,marginBottom:6}}>Svuota campo</button>
               <button onClick={function(){setAddingPlayer(true);}} style={{width:"100%",background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",color:"#818cf8",borderRadius:7,padding:"7px",cursor:"pointer",fontSize:11,fontWeight:700}}>+ Aggiungi giocatore</button></div>
-          </div>
-          <div>
-            {isCompare&&<CompareHeader t1={{name:name,color:color}} t2={{name:name2,color:color2}} lu1={lineup} lu2={lineup2}/>}
-            <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/>
-          </div>
-          {isCompare&&<div>
-            <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={handleDrop2} onClick={function(slot){var pos2=(FORMATIONS[form2]?FORMATIONS[form2].positions:[]).find(function(p){return p.slot===slot;});setPicking({slot:slot,role:pos2?pos2.role:null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={function(){}} coach={coach2} numbers={{}}/>
           </div>}
-          {col3}
-          {!mobile&&!isCompare&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
+          {isCompare?<React.Fragment>
+            <div>
+              <div style={{background:T.pn,borderRadius:10,border:"1px solid "+color+"44",padding:"8px 10px",marginBottom:8}}>
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                  <KitSVG color={color} size={20}/><input value={name} onChange={function(e){setName(e.target.value);}} style={{flex:1,background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"4px 7px",color:T.tx,fontSize:12,fontWeight:700,outline:"none"}}/></div>
+                <button onClick={function(){setTeamPicker({team:1});}} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #16a34a44",background:"rgba(22,163,74,0.1)",color:"#16a34a",fontSize:9,fontWeight:700,cursor:"pointer"}}>Carica squadra A</button></div>
+              <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/>
+            </div>
+            <div>
+              <div style={{background:T.pn,borderRadius:10,border:"1px solid "+color2+"44",padding:"8px 10px",marginBottom:8}}>
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                  <KitSVG color={color2} size={20}/><input value={name2} onChange={function(e){setName2(e.target.value);}} style={{flex:1,background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"4px 7px",color:T.tx,fontSize:12,fontWeight:700,outline:"none"}}/></div>
+                <button onClick={function(){setTeamPicker({team:2});}} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #2563eb44",background:"rgba(37,99,235,0.1)",color:"#60a5fa",fontSize:9,fontWeight:700,cursor:"pointer"}}>Carica squadra B</button></div>
+              <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={handleDrop2} onClick={function(slot){var pos2=(FORMATIONS[form2]?FORMATIONS[form2].positions:[]).find(function(p){return p.slot===slot;});setPicking({slot:slot,role:pos2?pos2.role:null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={function(){}} coach={coach2} numbers={{}}/>
+            </div>
+          </React.Fragment>:<React.Fragment>
+            <div><PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers}/></div>
+            {col3}
+            {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:10}}><SquadStats lineup={lineup}/></div>}
+          </React.Fragment>}
         </main>
+        {isCompare&&<div style={{maxWidth:1280,margin:"8px auto",padding:"0 10px"}}><CompareHeader t1={{name:name,color:color}} t2={{name:name2,color:color2}} lu1={lineup} lu2={lineup2}/></div>}
         {teamPicker&&<TeamPicker onSelect={loadTeam} onClose={function(){setTeamPicker(false);}}/>}
         {picking&&<PlayerSearch onSelect={selectPlayer} onClose={function(){setPicking(null);}} role={picking.role} lineup={picking.team===2?lineup2:lineup} isAlt={picking.isAlt||false} teamName={name} customPlayers={customPlayers}/>}
         {altPick&&<AltPicker player={altPick} lineup={lineup} positions={positions} onSelect={altSlotSelect} onClose={function(){setAltPick(null);}}/>}
@@ -939,6 +964,7 @@ export default function App(){
           onClose={function(){setPlayerDetail(null);}}
           onRemove={function(s){removePlayer(s);setPlayerDetail(null);}}
           onReplace={function(s){var pos2=(FORMATIONS[form]?FORMATIONS[form].positions:[]).find(function(p){return p.slot===s;});setPicking({slot:s,role:pos2?pos2.role:null,isAlt:false});setPlayerDetail(null);}}
+          onAddAlt={function(s){var pos2=(FORMATIONS[form]?FORMATIONS[form].positions:[]).find(function(p){return p.slot===s;});setPicking({slot:s,role:pos2?pos2.role:null,isAlt:true});setPlayerDetail(null);}}
           onEdit={function(p){setEditingPlayer(p);setPlayerDetail(null);}}
           cap={cap} onSetCap={setCap}/>}
         {addingPlayer&&<AddPlayerModal onClose={function(){setAddingPlayer(false);}} onAdd={function(p){setCustomPlayers(function(prev){return prev.concat([p]);});setAddingPlayer(false);setToast(p.shortName+" aggiunto!");}}/>}
