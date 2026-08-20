@@ -103,7 +103,7 @@ function PitchView(props){
   return(
     <div style={{perspective:small?"none":"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:small?2:12}}>
       {coach&&!small&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
-      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:small?"155%":"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?6:10,overflow:"hidden",transform:small?"none":"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:small?"0 4px 16px rgba(0,0,0,0.4)":"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33",willChange:"transform",WebkitBackfaceVisibility:"hidden",backfaceVisibility:"hidden",WebkitFontSmoothing:"antialiased"}}
+      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:small?"155%":"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?6:10,overflow:"hidden",transform:small?"translateZ(0)":"rotateX(8deg) translateZ(0)",transformOrigin:"50% 30%",boxShadow:small?"0 4px 16px rgba(0,0,0,0.4)":"0 20px 50px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33",willChange:"transform",backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden"}}
         onDragOver={function(e){e.preventDefault();}}
         onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
         <svg viewBox="0 0 340 480" preserveAspectRatio="xMidYMid slice" style={{position:"absolute",inset:0,width:"100%",height:"100%",borderRadius:10}}>
@@ -147,11 +147,11 @@ function PitchView(props){
           </g>
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
         </svg>
-        <div style={{position:"absolute",top:4,left:6,zIndex:15}}>
-          <div style={{background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(255,255,255,0.12)",marginBottom:2}}>
-            <span style={{fontSize:small?6:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
-          {!small&&<div style={{background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 8px",display:"inline-block"}}>
-            <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.55)"}}>{form}</span></div>}</div>
+        <div style={{position:"absolute",top:4,left:6,zIndex:15,display:"flex",gap:4,alignItems:"center"}}>
+          <div style={{background:"rgba(0,0,0,0.6)",borderRadius:3,padding:small?"1px 4px":"2px 8px",border:"1px solid rgba(255,255,255,0.12)"}}>
+            <span style={{fontSize:small?5:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>LINEUP BUILDER</span></div>
+          {!small&&<div style={{background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 6px"}}>
+            <span style={{fontSize:8,fontWeight:700,color:"rgba(255,255,255,0.5)"}}>{form}</span></div>}</div>
         <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:small?"1px 5px":"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:small?2:4}}>
           <div style={{width:small?8:11,height:small?8:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:6,fontWeight:900,color:"#fff"}}>U</div>
           <span style={{fontSize:small?5:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.3px"}}>UNIVERSO SPORTIVO</span></div>
@@ -942,18 +942,16 @@ export default function App(){
             <StatSel stats={stats} setStats={setStats}/>
           </div>}
           {isCompare?<React.Fragment>
-            <div style={{maxWidth:mobile?'100%':420}}>
-              <div style={{background:T.pn,borderRadius:10,border:"1px solid "+color+"44",padding:"6px 8px",marginBottom:6}}>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
-                  <KitSVG color={color} size={18}/><input value={name} onChange={function(e){setName(e.target.value);}} style={{flex:1,background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"3px 6px",color:T.tx,fontSize:11,fontWeight:700,outline:"none"}}/></div>
-                <button onClick={function(){setTeamPicker({team:1});}} style={{width:"100%",padding:"4px",borderRadius:5,border:"1px solid #16a34a44",background:"rgba(22,163,74,0.1)",color:"#16a34a",fontSize:9,fontWeight:700,cursor:"pointer"}}>Carica squadra A</button></div>
+            <div style={{minWidth:0}}>
+              <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:4}}>
+                <KitSVG color={color} size={16}/><input value={name} onChange={function(e){setName(e.target.value);}} style={{flex:1,minWidth:0,background:T.ib,border:"1px solid "+T.bd,borderRadius:4,padding:"2px 5px",color:T.tx,fontSize:10,fontWeight:700,outline:"none"}}/>
+                <button onClick={function(){setTeamPicker({team:1});}} style={{padding:"2px 6px",borderRadius:4,border:"1px solid #16a34a44",background:"rgba(22,163,74,0.1)",color:"#16a34a",fontSize:8,fontWeight:700,cursor:"pointer",flexShrink:0}}>Carica</button></div>
               <PitchView lineup={lineup} alts={alts} form={form} onDrop={handleDrop} onClick={slotClick} name={name} color={color} stats={stats} kits={kits} cap={cap} customPos={customPos} onPitchDrop={handlePitchDrop} coach={coach} numbers={numbers} small={true}/>
             </div>
-            <div style={{maxWidth:mobile?'100%':420}}>
-              <div style={{background:T.pn,borderRadius:10,border:"1px solid "+color2+"44",padding:"6px 8px",marginBottom:6}}>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
-                  <KitSVG color={color2} size={18}/><input value={name2} onChange={function(e){setName2(e.target.value);}} style={{flex:1,background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"3px 6px",color:T.tx,fontSize:11,fontWeight:700,outline:"none"}}/></div>
-                <button onClick={function(){setTeamPicker({team:2});}} style={{width:"100%",padding:"4px",borderRadius:5,border:"1px solid #2563eb44",background:"rgba(37,99,235,0.1)",color:"#60a5fa",fontSize:9,fontWeight:700,cursor:"pointer"}}>Carica squadra B</button></div>
+            <div style={{minWidth:0}}>
+              <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:4}}>
+                <KitSVG color={color2} size={16}/><input value={name2} onChange={function(e){setName2(e.target.value);}} style={{flex:1,minWidth:0,background:T.ib,border:"1px solid "+T.bd,borderRadius:4,padding:"2px 5px",color:T.tx,fontSize:10,fontWeight:700,outline:"none"}}/>
+                <button onClick={function(){setTeamPicker({team:2});}} style={{padding:"2px 6px",borderRadius:4,border:"1px solid #2563eb44",background:"rgba(37,99,235,0.1)",color:"#60a5fa",fontSize:8,fontWeight:700,cursor:"pointer",flexShrink:0}}>Carica</button></div>
               <PitchView lineup={lineup2} alts={{}} form={form2} onDrop={handleDrop2} onClick={function(slot){var pos2=(FORMATIONS[form2]?FORMATIONS[form2].positions:[]).find(function(p){return p.slot===slot;});setPicking({slot:slot,role:pos2?pos2.role:null,isAlt:false,team:2});}} name={name2} color={color2} stats={stats} kits={kits} cap={null} customPos={{}} onPitchDrop={function(){}} coach={coach2} numbers={{}} small={true}/>
             </div>
           </React.Fragment>:<React.Fragment>
