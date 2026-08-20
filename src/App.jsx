@@ -35,13 +35,17 @@ function KitSVG(props){
 
 function StatBadges(props){var player=props.player,stats=props.stats,color=props.color;
   if(!player)return null;
-  var items=STAT_VIEWS.filter(function(s){return stats.includes(s.id)&&s.id!=="rating"&&player[s.id]!==undefined;});
-  if(!items.length)return null;
-  return(<div style={{display:"flex",gap:3,justifyContent:"center",marginTop:2,flexWrap:"wrap"}}>
-    {items.slice(0,3).map(function(sv){var exp=sv.id==="contract"&&player.contract<=2026;var c2=exp?"#ef4444":sv.color;
-      var l=sv.id==="nation"?(NATION_FLAGS[player.nation]||player.nation):sv.id==="foot"?(player.foot==="L"?"Sin":"Dx"):(""+sv.icon+" "+sv.format(player[sv.id]));
-      return <div key={sv.id} style={{background:"rgba(0,0,0,0.7)",border:"1px solid "+c2+"55",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:c2,whiteSpace:"nowrap",lineHeight:"12px"}}>{l}</div>;
-    })}</div>);
+  var parts=[];
+  if(stats.includes("value"))parts.push("\u20AC"+player.value+"M");
+  if(stats.includes("age"))parts.push(player.age+"a");
+  if(stats.includes("wage"))parts.push("\u20AC"+(player.wage/1000).toFixed(1)+"M/a");
+  if(stats.includes("height"))parts.push(player.height+"cm");
+  if(stats.includes("foot"))parts.push(player.foot==="L"?"Sin":"Dx");
+  if(stats.includes("contract")){var exp=player.contract<=2026;parts.push((exp?"!":"")+player.contract);}
+  if(stats.includes("nation"))parts.push(NATION_FLAGS[player.nation]||player.nation);
+  if(!parts.length)return null;
+  return(<div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:"1px 6px",fontSize:7,fontWeight:700,color:"#9ca3af",whiteSpace:"nowrap",lineHeight:"13px",marginTop:1,textAlign:"center"}}>
+    {parts.join("  ")}</div>);
 }
 
 var td={on:false,player:null,fromSlot:null,ghost:null,dropCb:null};
@@ -142,9 +146,6 @@ function PitchView(props){
             <rect x="128" y="462" width="84" height="16" rx="2" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
           </g>
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
-          <text x="170" y="455" textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="8" fontWeight="800" letterSpacing="2">LINEUP BUILDER</text>
-          <text x="14" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(-90,14,236)">LINEUP BUILDER</text>
-          <text x="326" y="236" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.04)" fontSize="8" fontWeight="900" letterSpacing="4" transform="rotate(90,326,236)">LINEUP BUILDER</text>
         </svg>
         <div style={{position:"absolute",top:6,left:12,background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 8px",fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,zIndex:5}}>{form}</div>
         {positions.map(function(p){return(
@@ -370,57 +371,51 @@ function ExportCanvas(props){
 
     // universosportivo.com inside stats bar as watermark
     ctx.textAlign="center";ctx.font="bold 11px sans-serif";
-    ctx.fillStyle="rgba(255,255,255,0.07)";
-    ctx.fillText("universosportivo.com",W/2,SY+sbH-8);
 
     if(filled.length){
       var avgR=(filled.reduce(function(a,p){return a+p.rating;},0)/filled.length).toFixed(1);
       var avgA=(filled.reduce(function(a,p){return a+(p.age||0);},0)/filled.length).toFixed(1);
-      var totV=filled.reduce(function(a,p){return a+(p.value||0);},0);
-      var totW=(filled.reduce(function(a,p){return a+(p.wage||0);},0)/1000).toFixed(1);
+      var totV=Math.round(filled.reduce(function(a,p){return a+(p.value||0);},0)*10)/10;
+      var totW=Math.round(filled.reduce(function(a,p){return a+(p.wage||0);},0)/100)/10;
       var metrics=[
         {l:"RATING",v:avgR,c:rcol(parseFloat(avgR)),sub:"medio"},
         {l:"VALORE",v:"\u20AC"+totV+"M",c:"#22c55e",sub:"rosa"},
         {l:"STIPENDI",v:"\u20AC"+totW+"M",c:"#f59e0b",sub:"per anno"},
-        {l:"ETÀ",v:avgA+"a",c:"#60a5fa",sub:"media"},
+        {l:"ETA",v:avgA+"a",c:"#60a5fa",sub:"media"},
         {l:"TITOLARI",v:filled.length+"/11",c:"#a78bfa",sub:"in campo"},
       ];
       metrics.forEach(function(m,i2){
         var mx=FX+(FW/5)*i2+(FW/10);
-        // divider
         if(i2>0){ctx.strokeStyle="rgba(255,255,255,0.08)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(FX+(FW/5)*i2,SY+15);ctx.lineTo(FX+(FW/5)*i2,SY+sbH-15);ctx.stroke();}
-        // value
-        ctx.fillStyle=m.c;ctx.font="900 26px 'Arial Black',sans-serif";ctx.textAlign="center";
-        ctx.fillText(m.v,mx,SY+50);
-        // label
+        ctx.fillStyle=m.c;ctx.font="900 24px sans-serif";ctx.textAlign="center";
+        ctx.fillText(m.v,mx,SY+48);
         ctx.fillStyle="rgba(255,255,255,0.55)";ctx.font="700 10px sans-serif";
-        ctx.fillText(m.l,mx,SY+68);
-        // sublabel
+        ctx.fillText(m.l,mx,SY+66);
         ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="400 9px sans-serif";
-        ctx.fillText(m.sub,mx,SY+82);
+        ctx.fillText(m.sub,mx,SY+80);
       });
     }
 
-    // --- FOOTER branding ---
-    var footY=Math.min(SY+sbH+18, H-30);
-    ctx.textAlign="center";
-    ctx.fillStyle="rgba(255,255,255,0.06)";ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(FX,footY-8);ctx.lineTo(FX+FW,footY-8);ctx.stroke();
-    // Logo mark
-    var lx=W/2-80,ly=footY;
-    ctx.fillStyle=kc0;
-    ctx.beginPath();ctx.roundRect(lx,ly,18,18,4);ctx.fill();
-    ctx.fillStyle="#fff";ctx.font="900 10px sans-serif";ctx.textAlign="center";
-    ctx.fillText("U",lx+9,ly+13);
-    ctx.textAlign="left";
-    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.font="700 14px sans-serif";
-    ctx.fillText("universo",lx+24,ly+9);
-    ctx.fillStyle=kc0;
-    ctx.fillText("sportivo",lx+24+ctx.measureText("universo").width,ly+9);
-    ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="400 11px sans-serif";
-    ctx.fillText(".com",lx+24+ctx.measureText("universosportivo").width,ly+9);
-    ctx.fillStyle="rgba(255,255,255,0.2)";ctx.font="400 9px sans-serif";ctx.textAlign="center";
-    ctx.fillText("Lineup Builder",W/2,ly+22);
+    // --- TARGHETTE on pitch ---
+    // Left bottom: LINEUP BUILDER
+    var tY=FY+FH-36;
+    ctx.fillStyle="rgba(0,0,0,0.55)";ctx.beginPath();ctx.roundRect(FX+14,tY,130,26,6);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.12)";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(FX+14,tY,130,26,6);ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,0.75)";ctx.font="800 11px sans-serif";ctx.textAlign="center";
+    ctx.fillText("LINEUP BUILDER",FX+14+65,tY+17);
+    // Right bottom: UNIVERSO SPORTIVO
+    ctx.fillStyle="rgba(0,0,0,0.55)";ctx.beginPath();ctx.roundRect(FX+FW-164,tY,150,26,6);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.12)";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(FX+FW-164,tY,150,26,6);ctx.stroke();
+    ctx.fillStyle=kc0;ctx.beginPath();ctx.roundRect(FX+FW-158,tY+4,16,16,3);ctx.fill();
+    ctx.fillStyle="#fff";ctx.font="900 9px sans-serif";ctx.textAlign="center";ctx.fillText("U",FX+FW-150,tY+15);
+    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.font="700 11px sans-serif";ctx.textAlign="left";
+    ctx.fillText("UNIVERSO",FX+FW-138,tY+13);
+    ctx.fillStyle=kc0;ctx.fillText("SPORTIVO",FX+FW-138+ctx.measureText("UNIVERSO ").width,tY+13);
+
+    // --- FOOTER ---
+    var footY=Math.min(SY+sbH+14, H-24);
+    ctx.fillStyle="rgba(255,255,255,0.15)";ctx.font="bold 11px sans-serif";ctx.textAlign="center";
+    ctx.fillText("universosportivo.com",W/2,footY+10);
 
     var a=document.createElement("a");a.download=(name||"lineup").replace(/\s/g,"-")+"-lineup.png";a.href=c.toDataURL("image/png");a.click();onDone();
   },[]);
