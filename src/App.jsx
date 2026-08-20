@@ -42,7 +42,6 @@ function StatBadges(props){var player=props.player,stats=props.stats,color=props
   if(stats.includes("height"))parts.push({t:player.height+"cm",c:"#a78bfa"});
   if(stats.includes("foot"))parts.push({t:player.foot==="L"?"Sin":"Dx",c:player.foot==="L"?"#ec4899":"#9ca3af"});
   if(stats.includes("contract")){var exp=player.contract<=2026;parts.push({t:(exp?"!":"")+player.contract,c:exp?"#ef4444":"#9ca3af"});}
-  if(stats.includes("nation"))parts.push({t:NATION_FLAGS[player.nation]||player.nation,c:"#9ca3af"});
   if(!parts.length)return null;
   return(<div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:"1px 6px",fontSize:7,fontWeight:700,whiteSpace:"nowrap",lineHeight:"13px",marginTop:1,textAlign:"center",display:"flex",gap:4,justifyContent:"center"}}>
     {parts.map(function(p,i){return <span key={i} style={{color:p.c}}>{p.t}</span>;})}</div>);
@@ -148,11 +147,11 @@ function PitchView(props){
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
         </svg>
         <div style={{position:"absolute",top:6,left:12,background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 8px",fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,zIndex:5}}>{form}</div>
-        <div style={{position:"absolute",bottom:8,left:10,background:"rgba(0,0,0,0.5)",borderRadius:5,padding:"3px 10px",border:"1px solid rgba(255,255,255,0.1)",zIndex:5}}>
-          <span style={{fontSize:8,fontWeight:800,color:"rgba(255,255,255,0.65)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
-        <div style={{position:"absolute",bottom:8,right:10,background:"rgba(0,0,0,0.5)",borderRadius:5,padding:"3px 8px",border:"1px solid rgba(255,255,255,0.1)",zIndex:5,display:"flex",alignItems:"center",gap:5}}>
-          <div style={{width:13,height:13,background:ac,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:8,fontWeight:800,color:"rgba(255,255,255,0.65)",letterSpacing:"0.5px"}}>UNIVERSO SPORTIVO</span></div>
+        <div style={{position:"absolute",bottom:"1%",left:"3%",background:"rgba(0,0,0,0.65)",borderRadius:6,padding:"4px 12px",border:"1px solid rgba(255,255,255,0.15)",zIndex:15}}>
+          <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.8)",letterSpacing:"1.2px"}}>LINEUP BUILDER</span></div>
+        <div style={{position:"absolute",bottom:"1%",right:"3%",background:"rgba(0,0,0,0.65)",borderRadius:6,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.15)",zIndex:15,display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:14,height:14,background:ac,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#fff"}}>U</div>
+          <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.8)",letterSpacing:"0.8px"}}>UNIVERSO SPORTIVO</span></div>
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
@@ -459,7 +458,7 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
   var _lf=useState("ALL"),leagueF=_lf[0],setLeagueF=_lf[1];
   var _r=useState(60),minR=_r[0],setMinR=_r[1];var _a1=useState(16),minA=_a1[0],setMinA=_a1[1];var _a2=useState(40),maxA=_a2[0],setMaxA=_a2[1];
   var _w1=useState(0),minW=_w1[0],setMinW=_w1[1];var _w2=useState(15),maxW=_w2[0],setMaxW=_w2[1];var _v1=useState(0),minV=_v1[0],setMinV=_v1[1];var _v2=useState(200),maxV=_v2[0],setMaxV=_v2[1];
-  var _f=useState("ALL"),footF=_f[0],setFootF=_f[1];var _co=useState("ALL"),conF=_co[0],setConF=_co[1];var _ad=useState(false),adv=_ad[0],setAdv=_ad[1];
+  var _f=useState("ALL"),footF=_f[0],setFootF=_f[1];var _cMin=useState(2025),conMin=_cMin[0],setConMin=_cMin[1];var _cMax=useState(2035),conMax=_cMax[0],setConMax=_cMax[1];var _ad=useState(false),adv=_ad[0],setAdv=_ad[1];
   var ref2=useRef();useEffect(function(){var t=setTimeout(function(){if(ref2.current)ref2.current.focus();},400);return function(){clearTimeout(t);};},[]);
   var PM={DEF:["CB","RB","LB"],MID:["DM","CM","AM","RM","LM"],ATT:["ST","RW","LW"]};
   var leagueNames=["ALL"].concat(ALL_LEAGUES.map(function(l){return l.name;}));
@@ -471,7 +470,7 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
     if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]&&PM[pf].indexOf(p.position)>=0))return false;
     if(cf!=="ALL"&&p.club!==cf)return false;if(p.rating<minR)return false;if(minA>16&&p.age<minA)return false;if(maxA<40&&p.age>maxA)return false;
     var wM=p.wage/1000;if(minW>0&&wM<minW)return false;if(maxW<15&&wM>maxW)return false;if(minV>0&&p.value<minV)return false;if(maxV<200&&p.value>maxV)return false;
-    if(footF!=="ALL"&&p.foot!==footF)return false;if(conF==="exp"&&p.contract>2026)return false;if(conF==="safe"&&p.contract<=2026)return false;return true;
+    if(footF!=="ALL"&&p.foot!==footF)return false;if(conMin>2025&&p.contract<conMin)return false;if(conMax<2035&&p.contract>conMax)return false;return true;
   }).sort(function(a,b){return b.rating-a.rating;});
   var pill=function(active,fn,label,col){col=col||"#16a34a";return <button onClick={fn} style={{padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:active?col:"transparent",borderColor:active?col:"rgba(128,128,128,0.25)",color:active?"#fff":T.dm,transition:"all .12s"}}>{label}</button>;};
   return(
@@ -497,7 +496,10 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
             ].map(function(x){return <div key={x.l} style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80,flexShrink:0}}>{x.l}</span>
               <input type="range" min={x.mn} max={x.mx} step={x.st} value={x.v} onChange={function(e){x.s(+e.target.value);}} style={{flex:1,accentColor:x.cl}}/><span style={{fontSize:11,fontWeight:800,color:x.cl,width:40,textAlign:"right"}}>{x.f(x.v)}</span></div>;})}
             <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80}}>Piede</span>{[["ALL","Tutti"],["R","Destro"],["L","Mancino"]].map(function(v){return pill(footF===v[0],function(){setFootF(v[0]);},v[1],"#ec4899");})}</div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80}}>Contratto</span>{[["ALL","Tutti"],["exp","In scad."],["safe","Sicuri"]].map(function(v){return pill(conF===v[0],function(){setConF(v[0]);},v[1],"#f97316");})}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80}}>Contratto da</span>
+              <input type="range" min={2025} max={2035} step={1} value={conMin} onChange={function(e){setConMin(+e.target.value);}} style={{flex:1,accentColor:"#f97316"}}/><span style={{fontSize:11,fontWeight:800,color:"#f97316",width:36,textAlign:"right"}}>{conMin<=2025?"--":conMin}</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,color:T.dm,width:80}}>Contratto a</span>
+              <input type="range" min={2025} max={2035} step={1} value={conMax} onChange={function(e){setConMax(+e.target.value);}} style={{flex:1,accentColor:"#f97316"}}/><span style={{fontSize:11,fontWeight:800,color:"#f97316",width:36,textAlign:"right"}}>{conMax>=2035?"--":conMax}</span></div>
           </div>}
           <div style={{fontSize:10,color:T.dm,textAlign:"right",marginTop:5}}>{list.length+" giocatori"}</div></div>
         <div style={{overflowY:"auto",flex:1}}>
