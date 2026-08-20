@@ -148,13 +148,14 @@ function PitchView(props){
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
         </svg>
         <div style={{position:"absolute",top:4,left:6,zIndex:15,display:"flex",gap:4,alignItems:"center"}}>
-          <div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:small?"2px 5px":"3px 8px",border:"1px solid rgba(255,255,255,0.2)"}}>
-            <span style={{fontSize:small?6:9,fontWeight:900,color:"#fff",letterSpacing:"0.8px"}}>LINEUP BUILDER</span></div>
+          <div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:small?"2px 5px":"3px 7px",border:"1px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",gap:small?3:4}}>
+            <div style={{width:small?9:12,height:small?9:12,background:"#16a34a",borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:7,fontWeight:900,color:"#fff"}}>L</div>
+            <span style={{fontSize:small?5:8,fontWeight:900,color:"#fff",letterSpacing:"0.3px"}}>LINEUP BUILDER</span></div>
           {!small&&<div style={{background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 6px"}}>
             <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>{form}</span></div>}</div>
         <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.75)",borderRadius:4,padding:small?"2px 5px":"3px 7px",border:"1px solid rgba(255,255,255,0.2)",zIndex:15,display:"flex",alignItems:"center",gap:small?3:4}}>
           <div style={{width:small?9:12,height:small?9:12,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:7,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:small?5:8,fontWeight:900,color:"#fff",letterSpacing:"0.3px"}}>UNIVERSO SPORTIVO</span></div>
+          <span style={{fontSize:small?5:8,fontWeight:900,color:"#fff",letterSpacing:"0.3px"}}>{small?"UNIVERSO SPORTIVO":"universosportivo.com"}</span></div>
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
