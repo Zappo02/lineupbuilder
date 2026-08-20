@@ -146,12 +146,14 @@ function PitchView(props){
           </g>
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
         </svg>
-        <div style={{position:"absolute",top:6,left:12,background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 8px",fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,zIndex:5}}>{form}</div>
-        <div style={{position:"absolute",bottom:"1%",left:"3%",background:"rgba(0,0,0,0.65)",borderRadius:6,padding:"4px 12px",border:"1px solid rgba(255,255,255,0.15)",zIndex:15}}>
-          <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.8)",letterSpacing:"1.2px"}}>LINEUP BUILDER</span></div>
-        <div style={{position:"absolute",bottom:"1%",right:"3%",background:"rgba(0,0,0,0.65)",borderRadius:6,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.15)",zIndex:15,display:"flex",alignItems:"center",gap:6}}>
-          <div style={{width:14,height:14,background:ac,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.8)",letterSpacing:"0.8px"}}>UNIVERSO SPORTIVO</span></div>
+        <div style={{position:"absolute",top:4,left:6,zIndex:15}}>
+          <div style={{background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 8px",border:"1px solid rgba(255,255,255,0.12)",marginBottom:2}}>
+            <span style={{fontSize:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
+          <div style={{background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 8px",display:"inline-block"}}>
+            <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.55)"}}>{form}</span></div></div>
+        <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:4}}>
+          <div style={{width:11,height:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:6,fontWeight:900,color:"#fff"}}>U</div>
+          <span style={{fontSize:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>UNIVERSO SPORTIVO</span></div>
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
@@ -751,7 +753,6 @@ function PlayerDetailModal(props){
           {row("Altezza",""+player.height+" cm","#a78bfa")}
           {row("Piede",player.foot==="L"?"Sinistro":"Destro",player.foot==="L"?"#ec4899":"#9ca3af")}
           {row("Contratto","fino al "+player.contract,player.contract<=2026?"#ef4444":"#9ca3af")}
-          {row("Nazionalita",NATION_FLAGS[player.nation]||player.nation)}
         </div>
         <div style={{padding:"8px 20px 18px",display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",gap:8}}>
