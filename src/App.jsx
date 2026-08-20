@@ -101,9 +101,9 @@ function PitchView(props){
   var ac=color||"#16a34a";
   // 3D perspective wrapper
   return(
-    <div style={{perspective:small?"none":"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:small?2:12}}>
+    <div style={{width:"100%",overflow:"hidden",paddingBottom:small?2:12}}>
       {coach&&!small&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
-      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:small?"155%":"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?6:10,overflow:"hidden",transform:small?"translateZ(0)":"rotateX(8deg) translateZ(0)",transformOrigin:"50% 30%",boxShadow:small?"0 4px 16px rgba(0,0,0,0.4)":"0 20px 50px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33",willChange:"transform",backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden"}}
+      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:small?"150%":"145%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?6:12,overflow:"hidden",boxShadow:small?"0 4px 16px rgba(0,0,0,0.4)":"0 8px 32px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
         onDragOver={function(e){e.preventDefault();}}
         onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
         <svg viewBox="0 0 340 480" preserveAspectRatio="xMidYMid slice" style={{position:"absolute",inset:0,width:"100%",height:"100%",borderRadius:10}}>
@@ -148,13 +148,13 @@ function PitchView(props){
           {name&&<text x="170" y="238" textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.03)" fontSize="24" fontWeight="900" letterSpacing="6">{name.toUpperCase()}</text>}
         </svg>
         <div style={{position:"absolute",top:4,left:6,zIndex:15,display:"flex",gap:4,alignItems:"center"}}>
-          <div style={{background:"rgba(0,0,0,0.6)",borderRadius:3,padding:small?"1px 4px":"2px 8px",border:"1px solid rgba(255,255,255,0.12)"}}>
-            <span style={{fontSize:small?5:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>LINEUP BUILDER</span></div>
-          {!small&&<div style={{background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 6px"}}>
-            <span style={{fontSize:8,fontWeight:700,color:"rgba(255,255,255,0.5)"}}>{form}</span></div>}</div>
-        <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:small?"1px 5px":"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:small?2:4}}>
-          <div style={{width:small?8:11,height:small?8:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:6,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:small?5:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.3px"}}>UNIVERSO SPORTIVO</span></div>
+          <div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:small?"2px 5px":"3px 8px",border:"1px solid rgba(255,255,255,0.2)"}}>
+            <span style={{fontSize:small?6:9,fontWeight:900,color:"#fff",letterSpacing:"0.8px"}}>LINEUP BUILDER</span></div>
+          {!small&&<div style={{background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 6px"}}>
+            <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>{form}</span></div>}</div>
+        <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.75)",borderRadius:4,padding:small?"2px 5px":"3px 7px",border:"1px solid rgba(255,255,255,0.2)",zIndex:15,display:"flex",alignItems:"center",gap:small?3:4}}>
+          <div style={{width:small?9:12,height:small?9:12,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:7,fontWeight:900,color:"#fff"}}>U</div>
+          <span style={{fontSize:small?5:8,fontWeight:900,color:"#fff",letterSpacing:"0.3px"}}>UNIVERSO SPORTIVO</span></div>
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
