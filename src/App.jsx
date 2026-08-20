@@ -54,7 +54,7 @@ function PitchSlot(props){
   var _=useState(false),over=_[0],setOver=_[1];
   var th=useContext(ThCtx);var T=TH[th];
   var c=POSITION_COLORS[pos.role]||"#6b7280";var b=tColor||c;var cnt=useRef(0);var timerRef=useRef(null);
-  var ks=small?32:44;var fs=small?9:11;var fsr=small?7:7;
+  var ks=small?24:44;var fs=small?7:11;var fsr=small?5:7;
   var ds=function(e){if(!player)return;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",JSON.stringify({id:player.id,slot:slot}));};
   var de=function(e){e.preventDefault();cnt.current++;setOver(true);};
   var dv=function(e){e.preventDefault();};
@@ -69,8 +69,8 @@ function PitchSlot(props){
   var S={position:"absolute",left:pos.x+"%",top:pos.y+"%",transform:"translate(-50%,-50%) rotateX(-12deg)",display:"flex",flexDirection:"column",alignItems:"center",gap:1,zIndex:over?20:10,transformStyle:"preserve-3d"};
   if(!player)return(
     <div data-slot={slot} style={S} onDragEnter={de} onDragOver={dv} onDragLeave={dl} onDrop={dd}>
-      <div onClick={function(){onClick(slot);}} style={{width:44,height:44,borderRadius:"50%",border:"2px dashed "+c+"88",backgroundColor:over?c+"33":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:c+"aa",cursor:"pointer",transform:over?"scale(1.15)":"scale(1)",transition:"all .2s",boxShadow:over?"0 0 20px "+c+"55":"none"}}>+</div>
-      <div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:"1px 7px",fontSize:8,color:c,fontWeight:700}}>{pos.role}</div>
+      <div onClick={function(){onClick(slot);}} style={{width:small?28:44,height:small?28:44,borderRadius:"50%",border:"2px dashed "+c+"88",backgroundColor:over?c+"33":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?14:22,color:c+"aa",cursor:"pointer",transform:over?"scale(1.15)":"scale(1)",transition:"all .2s",boxShadow:over?"0 0 20px "+c+"55":"none"}}>+</div>
+      <div style={{background:"rgba(0,0,0,0.75)",borderRadius:3,padding:"1px 5px",fontSize:small?5:8,color:c,fontWeight:700}}>{pos.role}</div>
     </div>);
   var accent=tColor||c;
   return(
@@ -82,9 +82,9 @@ function PitchSlot(props){
         {stats.includes("rating")&&<div style={{position:"absolute",top:-6,right:-8,background:rcol(player.rating),color:"#000",fontSize:small?7:9,fontWeight:900,borderRadius:small?3:5,padding:"0 3px",lineHeight:small?"13px":"16px",minWidth:small?14:18,textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.6)",border:"1px solid rgba(255,255,255,0.2)"}}>{player.rating}</div>}
         {num&&<div style={{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",fontSize:10,fontWeight:900,color:"rgba(255,255,255,0.85)",textShadow:"0 1px 4px rgba(0,0,0,0.9)"}}>{num}</div>}
       </div>
-      <div style={{background:"rgba(4,6,14,0.94)",borderRadius:small?5:7,padding:small?"2px 6px":"3px 9px",maxWidth:small?72:92,textAlign:"center",boxShadow:"0 3px 12px rgba(0,0,0,0.8)",borderLeft:"3px solid "+accent,borderTop:"1px solid rgba(255,255,255,0.06)",borderBottom:"1px solid rgba(255,255,255,0.03)",borderRight:"none"}} onClick={function(){onClick(slot);}}>
-        <div style={{fontSize:fsr,color:c,fontWeight:800,letterSpacing:"0.8px",textTransform:"uppercase"}}>{pos.role+zoneLabel}</div>
-        <div style={{fontSize:fs,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"15px"}}>{cap===player.id?"\u00A9 ":""}{player.shortName}</div>
+      <div style={{background:"rgba(4,6,14,0.94)",borderRadius:small?4:7,padding:small?"1px 4px":"3px 9px",maxWidth:small?60:92,textAlign:"center",boxShadow:"0 3px 12px rgba(0,0,0,0.8)",borderLeft:(small?"2":"3")+"px solid "+accent,borderTop:"1px solid rgba(255,255,255,0.06)",borderBottom:"1px solid rgba(255,255,255,0.03)",borderRight:"none"}} onClick={function(){onClick(slot);}}>
+        <div style={{fontSize:fsr,color:c,fontWeight:800,letterSpacing:"0.5px",textTransform:"uppercase",lineHeight:small?"9px":"12px"}}>{pos.role}</div>
+        <div style={{fontSize:fs,color:"#fff",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:small?"10px":"15px"}}>{player.shortName}</div>
         {alt&&<div style={{fontSize:8,color:"#34d399",fontWeight:600,borderTop:"1px solid rgba(52,211,153,0.2)",marginTop:1,paddingTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{alt.shortName}</div>}
       </div>
       {!small&&<StatBadges player={player} stats={stats} color={accent}/>}
@@ -904,7 +904,7 @@ export default function App(){
   return(
     <ThCtx.Provider value={theme}>
       <div style={{minHeight:"100vh",background:T.bg,color:T.tx,fontFamily:"'Inter',sans-serif"}}>
-        <style>{"*{box-sizing:border-box;}html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}input[type=range]{accent-color:#ffd700;}button:active{opacity:0.8;transform:scale(0.97);}@media(max-width:900px){.mob-hide{display:none!important;}.mob-full{grid-column:1/-1!important;}}"}</style>
+        <style>{"*{box-sizing:border-box;}html,body{margin:0;padding:0;overflow-x:hidden;width:100%;max-width:100vw;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.2);border-radius:2px;}input[type=range]{accent-color:#ffd700;}button:active{opacity:0.8;transform:scale(0.97);}@media(max-width:900px){.mob-hide{display:none!important;}.mob-full{grid-column:1/-1!important;}}"}</style>
         <header style={{background:T.hd,backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.bd,padding:"6px 10px",position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 24px rgba(0,0,0,0.35)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
