@@ -101,9 +101,9 @@ function PitchView(props){
   var ac=color||"#16a34a";
   // 3D perspective wrapper
   return(
-    <div style={{perspective:small?"600px":"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:small?4:12}}>
-      {coach&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
-      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?8:10,overflow:"visible",transform:small?"rotateX(6deg)":"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
+    <div style={{perspective:small?"none":"900px",perspectiveOrigin:"50% 25%",width:"100%",overflow:"hidden",paddingBottom:small?2:12}}>
+      {coach&&!small&&<div style={{textAlign:"center",padding:"10px 0 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:T.tx,letterSpacing:"1px"}}>{coach}</div>}
+      <div ref={pitchRef} data-pitch="1" style={{position:"relative",width:"100%",paddingBottom:small?"155%":"140%",userSelect:"none",WebkitUserSelect:"none",borderRadius:small?6:10,overflow:"hidden",transform:small?"none":"rotateX(12deg)",transformOrigin:"50% 30%",boxShadow:small?"0 4px 16px rgba(0,0,0,0.4)":"0 30px 60px rgba(0,0,0,0.5),0 0 0 2px "+ac+"33"}}
         onDragOver={function(e){e.preventDefault();}}
         onDrop={function(e){e.preventDefault();var tgt=e.target.closest("[data-slot]");if(tgt)return;try{var d=JSON.parse(e.dataTransfer.getData("text/plain"));if(d.slot===undefined)return;var r2=e.currentTarget.getBoundingClientRect();var xP=Math.max(5,Math.min(95,((e.clientX-r2.left)/r2.width)*100));var yP=Math.max(5,Math.min(95,((e.clientY-r2.top)/r2.height)*100));if(onPitchDrop)onPitchDrop(d.slot,xP,yP);}catch(ex){}}}>
         <svg viewBox="0 0 340 480" preserveAspectRatio="xMidYMid slice" style={{position:"absolute",inset:0,width:"100%",height:"100%",borderRadius:10}}>
@@ -152,9 +152,9 @@ function PitchView(props){
             <span style={{fontSize:small?6:8,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"1px"}}>LINEUP BUILDER</span></div>
           {!small&&<div style={{background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 8px",display:"inline-block"}}>
             <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.55)"}}>{form}</span></div>}</div>
-        {!small&&<div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:4}}>
-          <div style={{width:11,height:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:6,fontWeight:900,color:"#fff"}}>U</div>
-          <span style={{fontSize:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.5px"}}>UNIVERSO SPORTIVO</span></div>}
+        <div style={{position:"absolute",top:4,right:6,background:"rgba(0,0,0,0.6)",borderRadius:4,padding:small?"1px 5px":"2px 7px",border:"1px solid rgba(255,255,255,0.12)",zIndex:15,display:"flex",alignItems:"center",gap:small?2:4}}>
+          <div style={{width:small?8:11,height:small?8:11,background:ac,borderRadius:2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:small?5:6,fontWeight:900,color:"#fff"}}>U</div>
+          <span style={{fontSize:small?5:7,fontWeight:800,color:"rgba(255,255,255,0.75)",letterSpacing:"0.3px"}}>{small?"US":"UNIVERSO SPORTIVO"}</span></div>
         {positions.map(function(p){return(
           <PitchSlot key={p.slot} slot={p.slot} pos={p} player={lineup[p.slot]||null}
             alt={alts[p.slot]?PLAYERS.find(function(x){return x.id===alts[p.slot];})||null:null}
@@ -936,7 +936,7 @@ export default function App(){
           :<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{saved.map(function(e){return(
             <div key={e.id} onClick={function(){load(e);}} style={{background:T.ib,border:"1px solid "+e.color+"55",borderRadius:10,padding:"7px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>
               <div style={{width:9,height:9,borderRadius:"50%",background:e.color,boxShadow:"0 0 6px "+e.color}}/><div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>{e.name}</div><div style={{fontSize:9,color:T.dm}}>{e.formation+" "+e.date}</div></div></div>);})}</div>}</div>}
-        <main style={{maxWidth:1280,margin:"0 auto",padding:"14px 10px",display:"grid",gridTemplateColumns:mobile?(isCompare?"1fr 1fr":"1fr"):(isCompare?"1fr 1fr":"210px 1fr 210px 190px"),gap:isCompare?8:12,alignItems:"start"}}>
+        <main style={{maxWidth:1280,margin:"0 auto",padding:"14px 10px",display:"grid",gridTemplateColumns:mobile?(isCompare?"1fr 1fr":"1fr"):(isCompare?"1fr 1fr":"210px 1fr 210px 190px"),gap:isCompare?6:12,alignItems:"start",overflow:"hidden"}}>
           {!isCompare&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
             <Settings name={name} setName={setName} color={color} setColor={setColor} form={form} setForm={setForm} kits={kits} setKits={setKits} onPick={function(){setTeamPicker(true);}}/>
             <StatSel stats={stats} setStats={setStats}/>
