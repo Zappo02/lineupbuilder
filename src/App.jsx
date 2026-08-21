@@ -8,7 +8,7 @@ var TH={
 };
 var ini=function(n){return n.split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase();};
 var rcol=function(r){return r>=90?"#ffd700":r>=85?"#c8c8c8":r>=80?"#cd7f32":"#6b7280";};
-var norm=function(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();};
+var norm=function(s){return s.trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();};
 var XLR={GK:"GK",ST:"ST",LS:"ST",RS:"ST",CF:"ST",LCB:"CB",RCB:"CB",CB:"CB",MCB:"CB",LB:"LB",LWB:"LB",RB:"RB",RWB:"RB",CDM:"DM",LCDM:"DM",RCDM:"DM",LCM:"CM",RCM:"CM",CM:"CM",CAM:"AM",LAM:"LW",RAM:"RW",LM:"LM",RM:"RM",LW:"LW",RW:"RW"};
 var SK="lu_v9";
 var encD=function(o){try{return btoa(unescape(encodeURIComponent(JSON.stringify(o))));}catch(e){return"";}};
@@ -465,14 +465,21 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
   var leagueNames=["ALL"].concat(ALL_LEAGUES.map(function(l){return l.name;}));
   var clubs=["ALL"].concat(Array.from(new Set(allP.filter(function(p){return leagueF==="ALL"||(LEAGUE_MAP[p.club]||"")=== leagueF;}).map(function(p){return p.club;}))).sort());
   var used=new Set(lineup.filter(Boolean).map(function(p){return p.id;}));
-  var list=allP.filter(function(p){
-    if(!isAlt&&used.has(p.id))return false;if(q&&!norm(p.name).includes(norm(q))&&!norm(p.club).includes(norm(q)))return false;
-    if(leagueF!=="ALL"&&(LEAGUE_MAP[p.club]||"")!==leagueF)return false;
-    if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]&&PM[pf].indexOf(p.position)>=0))return false;
-    if(cf!=="ALL"&&p.club!==cf)return false;if(p.rating<minR)return false;if(minA>16&&p.age<minA)return false;if(maxA<40&&p.age>maxA)return false;
-    var wM=p.wage/1000;if(minW>0&&wM<minW)return false;if(maxW<15&&wM>maxW)return false;if(minV>0&&p.value<minV)return false;if(maxV<200&&p.value>maxV)return false;
-    if(footF!=="ALL"&&p.foot!==footF)return false;if(conMin>2025&&p.contract<conMin)return false;if(conMax<2035&&p.contract>conMax)return false;return true;
-  }).sort(function(a,b){return b.rating-a.rating;});
+  var _vis=useState(30),visLimit=_vis[0],setVisLimit=_vis[1];
+  var qt=q.trim();
+  var list=[];
+  for(var pi=0;pi<allP.length&&list.length<visLimit+1;pi++){var p=allP[pi];
+    if(!isAlt&&used.has(p.id))continue;if(qt&&!norm(p.name).includes(norm(qt))&&!norm(p.club).includes(norm(qt)))continue;
+    if(leagueF!=="ALL"&&LEAGUE_MAP[p.club]&&LEAGUE_MAP[p.club]!==leagueF)continue;
+    if(pf!=="ALL"&&!(pf==="GK"&&p.position==="GK")&&!(PM[pf]&&PM[pf].indexOf(p.position)>=0))continue;
+    if(cf!=="ALL"&&p.club!==cf)continue;if(p.rating<minR)continue;if(minA>16&&p.age<minA)continue;if(maxA<40&&p.age>maxA)continue;
+    var wM=p.wage/1000;if(minW>0&&wM<minW)continue;if(maxW<15&&wM>maxW)continue;if(minV>0&&p.value<minV)continue;if(maxV<200&&p.value>maxV)continue;
+    if(footF!=="ALL"&&p.foot!==footF)continue;if(conMin>2025&&p.contract<conMin)continue;if(conMax<2035&&p.contract>conMax)continue;
+    list.push(p);
+  }
+  list.sort(function(a,b){return b.rating-a.rating;});
+  var hasMore=list.length>visLimit;
+  var shown=list.slice(0,visLimit);
   var pill=function(active,fn,label,col){col=col||"#16a34a";return <button onClick={fn} style={{padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:active?col:"transparent",borderColor:active?col:"rgba(128,128,128,0.25)",color:active?"#fff":T.dm,transition:"all .12s"}}>{label}</button>;};
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:12,backdropFilter:"blur(8px)"}}>
@@ -481,7 +488,7 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:800,color:T.tx}}>{isAlt?"Scegli riserva":"Scegli giocatore"} {role&&<span style={{marginLeft:7,fontSize:11,color:POSITION_COLORS[role]||"#6b7280",background:(POSITION_COLORS[role]||"#6b7280")+"22",padding:"2px 7px",borderRadius:5,fontWeight:700}}>{role}</span>}</div>
             <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"1px solid "+T.bd,color:T.dm,cursor:"pointer",fontSize:14,width:30,height:30,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center"}}>x</button></div>
-          <input ref={ref2} value={q} onChange={function(e){setQ(e.target.value);}} placeholder="Cerca per nome o club..." style={{width:"100%",background:T.ib,border:"1px solid "+T.bd,borderRadius:8,padding:"8px 12px",color:T.tx,fontSize:15,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+          <input ref={ref2} value={q} onChange={function(e){setQ(e.target.value);setVisLimit(30);}} placeholder="Cerca per nome o club..." style={{width:"100%",background:T.ib,border:"1px solid "+T.bd,borderRadius:8,padding:"8px 12px",color:T.tx,fontSize:15,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
             {["ALL","GK","DEF","MID","ATT"].map(function(g){return pill(pf===g,function(){setPf(g);},g);})}
             {teamName&&teamName!=="La mia Squadra"&&pill(cf===teamName,function(){setCf(cf===teamName?"ALL":teamName);},teamName,"#d97706")}
@@ -505,7 +512,7 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
           <div style={{fontSize:10,color:T.dm,textAlign:"right",marginTop:5}}>{list.length+" giocatori"}</div></div>
         <div style={{overflowY:"auto",flex:1}}>
           {list.length===0?<div style={{padding:28,textAlign:"center",color:T.dm}}>Nessun giocatore</div>
-          :list.map(function(p){var exp=p.contract<=2026;return(
+          :shown.map(function(p){var exp=p.contract<=2026;return(
             <div key={p.id} onClick={function(){onSelect(p);}} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 14px",cursor:"pointer",borderBottom:"1px solid "+T.bd,transition:"background .1s"}}>
               <KitSVG color={TEAM_COLORS[p.club]||"#555"} size={26} isGK={p.position==="GK"}/>
               <div style={{flex:1,minWidth:0}}>
@@ -514,6 +521,8 @@ function PlayerSearch(props){var onSelect=props.onSelect,onClose=props.onClose,r
               <div style={{fontSize:9,color:POSITION_COLORS[p.position]||"#6b7280",background:(POSITION_COLORS[p.position]||"#6b7280")+"22",padding:"2px 6px",borderRadius:4,fontWeight:700}}>{p.position}</div>
               <div style={{fontSize:13,fontWeight:800,color:rcol(p.rating),width:24,textAlign:"right"}}>{p.rating}</div>
             </div>);})}
+          {hasMore&&<div style={{padding:"12px",textAlign:"center"}}>
+            <button onClick={function(){setVisLimit(visLimit+30);}} style={{padding:"8px 24px",borderRadius:8,border:"1px solid #16a34a44",background:"rgba(22,163,74,0.1)",color:"#16a34a",fontSize:12,fontWeight:700,cursor:"pointer"}}>Carica altri</button></div>}
         </div></div></div>);
 }
 
@@ -687,6 +696,8 @@ function AddPlayerModal(props){
 
 function EditPlayerModal(props){
   var player=props.player,onSave=props.onSave,onClose=props.onClose;var th=useContext(ThCtx);var T=TH[th];
+  var _nm=useState(player.name),nm=_nm[0],setNm=_nm[1];
+  var _sn=useState(player.shortName),sn=_sn[0],setSn=_sn[1];
   var _rt=useState(player.rating),rt=_rt[0],setRt=_rt[1];
   var _ag=useState(player.age),ag=_ag[0],setAg=_ag[1];
   var _vl=useState(player.value),vl=_vl[0],setVl=_vl[1];
@@ -710,7 +721,12 @@ function EditPlayerModal(props){
             <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:T.tx}}>{player.name}</div>
               <div style={{fontSize:10,color:T.dm}}>{player.club}</div></div></div>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"1px solid "+T.bd,color:T.dm,cursor:"pointer",fontSize:14,width:28,height:28,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>x</button></div>
-        <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{padding:"10px 18px",display:"flex",gap:8}}>
+          <div style={{flex:2}}><div style={{fontSize:9,color:T.dm,marginBottom:3}}>Nome completo</div>
+            <input value={nm} onChange={function(e){setNm(e.target.value);}} style={{width:"100%",background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"4px 7px",color:T.tx,fontSize:12,outline:"none",boxSizing:"border-box"}}/></div>
+          <div style={{flex:1}}><div style={{fontSize:9,color:T.dm,marginBottom:3}}>Nome breve</div>
+            <input value={sn} onChange={function(e){setSn(e.target.value);}} style={{width:"100%",background:T.ib,border:"1px solid "+T.bd,borderRadius:5,padding:"4px 7px",color:T.tx,fontSize:12,outline:"none",boxSizing:"border-box"}}/></div></div>
+        <div style={{padding:"4px 18px 12px",display:"flex",flexDirection:"column",gap:10}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:10,color:T.dm,width:80}}>Posizione</span>
             <div style={{display:"flex",gap:3,flexWrap:"wrap",flex:1}}>{positions.map(function(p){return(
@@ -727,7 +743,7 @@ function EditPlayerModal(props){
           {sl("Contratto",ct,setCt,2025,2032,1,"#f97316")}
         </div>
         <div style={{padding:"12px 18px"}}>
-          <button onClick={function(){onSave({rating:rt,age:ag,value:vl,wage:wg,height:ht,foot:ft,contract:ct,position:pos});}} style={{width:"100%",padding:"11px",borderRadius:9,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}>Salva modifiche</button></div>
+          <button onClick={function(){onSave({name:nm,shortName:sn,rating:rt,age:ag,value:vl,wage:wg,height:ht,foot:ft,contract:ct,position:pos});}} style={{width:"100%",padding:"11px",borderRadius:9,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}>Salva modifiche</button></div>
       </div></div>);
 }
 
