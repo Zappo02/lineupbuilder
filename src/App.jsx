@@ -40,7 +40,7 @@ function StatBadges(props){var player=props.player,stats=props.stats,color=props
   if(stats.includes("age"))parts.push({t:player.age+"a",c:"#60a5fa"});
   if(stats.includes("wage"))parts.push({t:"\u20AC"+(player.wage/1000).toFixed(1)+"M/a",c:"#f59e0b"});
   if(stats.includes("height"))parts.push({t:player.height+"cm",c:"#a78bfa"});
-  if(stats.includes("foot"))parts.push({t:player.foot==="L"?"Sin":"Dx",c:player.foot==="L"?"#ec4899":"#9ca3af"});
+  if(stats.includes("wf"))parts.push({t:"\u2B50"+player.wf,c:"#fbbf24"});
   if(stats.includes("contract")){var exp=player.contract<=2026;parts.push({t:(exp?"!":"")+player.contract,c:exp?"#ef4444":"#9ca3af"});}
   if(!parts.length)return null;
   return(<div style={{background:"rgba(0,0,0,0.75)",borderRadius:4,padding:"1px 6px",fontSize:7,fontWeight:700,whiteSpace:"nowrap",lineHeight:"13px",marginTop:1,textAlign:"center",display:"flex",gap:4,justifyContent:"center"}}>
@@ -651,11 +651,11 @@ function AddPlayerModal(props){
   var _pos=useState("ST"),pos=_pos[0],setPos=_pos[1];var _cl=useState("Free Agent"),cl=_cl[0],setCl=_cl[1];
   var _rt=useState(75),rt=_rt[0],setRt=_rt[1];var _ag=useState(25),ag=_ag[0],setAg=_ag[1];
   var _vl=useState(10),vl=_vl[0],setVl=_vl[1];var _wg=useState(2000),wg=_wg[0],setWg=_wg[1];
-  var _ft=useState("R"),ft=_ft[0],setFt=_ft[1];var _ht=useState(180),ht=_ht[0],setHt=_ht[1];
+  var _ft=useState(3),wfAdd=_ft[0],setWfAdd=_ft[1];var _ht=useState(180),ht=_ht[0],setHt=_ht[1];
   var _ct=useState(2028),ct=_ct[0],setCt=_ct[1];var _na=useState("---"),na=_na[0],setNa=_na[1];
   var positions=["GK","CB","RB","LB","DM","CM","AM","RM","LM","RW","LW","ST"];
   var doAdd=function(){if(!nm.trim())return;
-    onAdd({id:Date.now(),name:nm.trim(),shortName:sn.trim()||nm.trim().split(" ").pop(),position:pos,club:cl,nation:na,rating:rt,age:ag,value:vl,wage:wg,height:ht,foot:ft,contract:ct});};
+    onAdd({id:Date.now(),name:nm.trim(),shortName:sn.trim()||nm.trim().split(" ").pop(),position:pos,club:cl,nation:na,rating:rt,age:ag,value:vl,wage:wg,height:ht,wf:wfAdd,contract:ct});};
   var field=function(label,val,setter,type,extra){return(
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:10,color:T.dm,width:70,flexShrink:0}}>{label}</span>
@@ -678,10 +678,7 @@ function AddPlayerModal(props){
             <span style={{fontSize:10,color:T.dm,width:70}}>Posizione</span>
             <div style={{display:"flex",gap:3,flexWrap:"wrap",flex:1}}>{positions.map(function(p){return(
               <button key={p} onClick={function(){setPos(p);}} style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:700,cursor:"pointer",border:"1px solid",background:pos===p?(POSITION_COLORS[p]||"#16a34a"):"transparent",borderColor:pos===p?(POSITION_COLORS[p]||"#16a34a"):"rgba(128,128,128,0.25)",color:pos===p?"#fff":T.dm}}>{p}</button>);})}</div></div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:10,color:T.dm,width:70}}>Piede</span>
-            {[["R","Destro"],["L","Mancino"]].map(function(v){return(
-              <button key={v[0]} onClick={function(){setFt(v[0]);}} style={{padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:ft===v[0]?"#ec4899":"transparent",borderColor:ft===v[0]?"#ec4899":"rgba(128,128,128,0.25)",color:ft===v[0]?"#fff":T.dm}}>{v[1]}</button>);})}</div>
+          {field("Piede debole",wfAdd,setWfAdd,"range",{mn:1,mx:5,cl:"#fbbf24",fmt:function(v){return "\u2B50".repeat(v);}})}
           {field("Rating",rt,setRt,"range",{mn:40,mx:99,cl:"#ffd700"})}
           {field("Eta",ag,setAg,"range",{mn:15,mx:45,cl:"#3b82f6"})}
           {field("Valore (M)",vl,setVl,"range",{mn:0,mx:200,st:1,cl:"#16a34a",fmt:function(v){return v+"M";}})}
@@ -703,7 +700,7 @@ function EditPlayerModal(props){
   var _vl=useState(player.value),vl=_vl[0],setVl=_vl[1];
   var _wg=useState(player.wage),wg=_wg[0],setWg=_wg[1];
   var _ht=useState(player.height),ht=_ht[0],setHt=_ht[1];
-  var _ft=useState(player.foot),ft=_ft[0],setFt=_ft[1];
+  var _wf2=useState(player.wf||3),wf2=_wf2[0],setWf2=_wf2[1];
   var _ct=useState(player.contract),ct=_ct[0],setCt=_ct[1];
   var _pos=useState(player.position),pos=_pos[0],setPos=_pos[1];
   var positions=["GK","CB","RB","LB","DM","CM","AM","RM","LM","RW","LW","ST"];
@@ -731,19 +728,16 @@ function EditPlayerModal(props){
             <span style={{fontSize:10,color:T.dm,width:80}}>Posizione</span>
             <div style={{display:"flex",gap:3,flexWrap:"wrap",flex:1}}>{positions.map(function(p){return(
               <button key={p} onClick={function(){setPos(p);}} style={{padding:"2px 5px",borderRadius:4,fontSize:8,fontWeight:700,cursor:"pointer",border:"1px solid",background:pos===p?(POSITION_COLORS[p]||"#16a34a"):"transparent",borderColor:pos===p?(POSITION_COLORS[p]||"#16a34a"):"rgba(128,128,128,0.25)",color:pos===p?"#fff":T.dm}}>{p}</button>);})}</div></div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:10,color:T.dm,width:80}}>Piede</span>
-            {[["R","Destro"],["L","Mancino"]].map(function(v){return(
-              <button key={v[0]} onClick={function(){setFt(v[0]);}} style={{padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",border:"1px solid",background:ft===v[0]?"#ec4899":"transparent",borderColor:ft===v[0]?"#ec4899":"rgba(128,128,128,0.25)",color:ft===v[0]?"#fff":T.dm}}>{v[1]}</button>);})}</div>
           {sl("Rating",rt,setRt,40,99,1,"#ffd700")}
           {sl("Eta",ag,setAg,15,45,1,"#3b82f6")}
           {sl("Valore",vl,setVl,0,200,1,"#16a34a",function(v){return v+"M";})}
           {sl("Stipendio",wg,setWg,0,15000,100,"#f59e0b",function(v){return(v/1000).toFixed(1)+"M";})}
           {sl("Altezza",ht,setHt,155,210,1,"#8b5cf6",function(v){return v+"cm";})}
+          {sl("Piede debole",wf2,setWf2,1,5,1,"#fbbf24",function(v){return "\u2B50".repeat(v);})}
           {sl("Contratto",ct,setCt,2025,2032,1,"#f97316")}
         </div>
         <div style={{padding:"12px 18px"}}>
-          <button onClick={function(){onSave({name:nm,shortName:sn,rating:rt,age:ag,value:vl,wage:wg,height:ht,foot:ft,contract:ct,position:pos});}} style={{width:"100%",padding:"11px",borderRadius:9,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}>Salva modifiche</button></div>
+          <button onClick={function(){onSave({name:nm,shortName:sn,rating:rt,age:ag,value:vl,wage:wg,height:ht,wf:wf2,contract:ct,position:pos});}} style={{width:"100%",padding:"11px",borderRadius:9,border:"none",background:"linear-gradient(135deg,#16a34a,#059669)",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}>Salva modifiche</button></div>
       </div></div>);
 }
 
@@ -778,7 +772,7 @@ function PlayerDetailModal(props){
           {row("Stipendio annuo","\u20AC"+(player.wage/1000).toFixed(1)+"M/a","#f59e0b")}
           {row("Eta",""+player.age+" anni","#60a5fa")}
           {row("Altezza",""+player.height+" cm","#a78bfa")}
-          {row("Piede",player.foot==="L"?"Sinistro":"Destro",player.foot==="L"?"#ec4899":"#9ca3af")}
+          {row("Piede debole","\u2B50".repeat(player.wf||3),"#fbbf24")}
           {row("Contratto","fino al "+player.contract,player.contract<=2026?"#ef4444":"#9ca3af")}
         </div>
         <div style={{padding:"8px 20px 18px",display:"flex",flexDirection:"column",gap:8}}>
@@ -979,8 +973,8 @@ export default function App(){
                 var avgA=(f.reduce(function(a,p){return a+p.age;},0)/f.length).toFixed(1);
                 var totV=Math.round(f.reduce(function(a,p){return a+p.value;},0)*10)/10;
                 var totW=Math.round(f.reduce(function(a,p){return a+p.wage;},0)/100)/10;
-                var lft=f.filter(function(p){return p.foot==="L";}).length;
-                var items=[{l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},{l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},{l:"Piede",v:(f.length-lft)+"D "+lft+"S",c:"#f472b6"}];
+                var avgH=(f.reduce(function(a,p){return a+p.height;},0)/f.length).toFixed(0);
+                var items=[{l:"OVR",v:avgR,c:"#22d3ee"},{l:"Valore",v:"\u20AC"+totV+"M",c:"#22c55e"},{l:"Stipendi/a",v:"\u20AC"+totW+"M",c:"#f59e0b"},{l:"Eta",v:avgA+"a",c:"#a78bfa"},{l:"Altezza",v:avgH+"cm",c:"#f472b6"}];
                 return <div style={{display:"flex",justifyContent:"center",gap:12,flexWrap:"wrap",marginTop:10}}>
                   {items.map(function(m){return <div key={m.l} style={{textAlign:"center"}}>
                     <div style={{fontSize:15,fontWeight:900,color:m.c,textShadow:"0 0 12px "+m.c+"66"}}>{m.v}</div>
